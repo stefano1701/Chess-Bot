@@ -1,0 +1,177 @@
+# Chess Bot engine configuration
+#
+# This is the single place for selecting engine behavior and tuning chess
+# knowledge. Only the [engine] random strategy is active today. Every other
+# section is disabled until its feature is implemented and tested.
+
+[meta]
+schema_version = 1
+config_name = "learning-defaults"
+score_unit = "centipawns"
+
+[engine]
+name = "Random Bot"
+strategy = "random"          # The only currently supported strategy.
+random_seed = -1             # -1 = fresh randomness; 0 or higher = repeatable.
+threads = 1                  # Reserved for future search.
+hash_size_mb = 16            # Reserved for a future transposition table.
+ponder = false
+
+[search]
+enabled = false
+algorithm = "none"           # Future values: one_ply, negamax, alpha_beta.
+max_depth = 0
+iterative_deepening = false
+time_limit_ms = 0             # 0 = no search clock.
+node_limit = 0                # 0 = unlimited.
+move_ordering = "none"
+aspiration_windows = false
+aspiration_window_cp = 0
+transposition_table = false
+
+[search.pruning]
+alpha_beta = false
+null_move = false
+null_move_reduction = 0
+late_move_reductions = false
+futility = false
+razoring = false
+
+[search.extensions]
+checks = 0
+recaptures = 0
+passed_pawns = 0
+
+[evaluation]
+enabled = false
+perspective = "white"        # Positive scores will mean White is better.
+mate_score = 100000
+draw_score = 0
+tempo_bonus = 0
+
+[evaluation.weights]
+material = 0.0
+piece_square_tables = 0.0
+mobility = 0.0
+pawn_structure = 0.0
+king_safety = 0.0
+space = 0.0
+development = 0.0
+endgame = 0.0
+
+[evaluation.material]
+enabled = false
+pawn = 100
+knight = 320
+bishop = 330
+rook = 500
+queen = 900
+king = 0
+bishop_pair_bonus = 0
+
+[evaluation.piece_square_tables]
+enabled = false
+opening_table = "none"
+endgame_table = "none"
+interpolate_by_phase = false
+
+[evaluation.mobility]
+enabled = false
+knight_move_bonus = 0
+bishop_move_bonus = 0
+rook_move_bonus = 0
+queen_move_bonus = 0
+legal_move_bonus = 0
+
+[evaluation.pawns]
+enabled = false
+doubled_penalty = 0
+isolated_penalty = 0
+backward_penalty = 0
+passed_bonus_by_rank = [0, 0, 0, 0, 0, 0, 0, 0]
+connected_bonus = 0
+pawn_island_penalty = 0
+
+[evaluation.king_safety]
+enabled = false
+castled_bonus = 0
+lost_castling_rights_penalty = 0
+pawn_shield_bonus = 0
+open_file_near_king_penalty = 0
+attacker_weight = 0
+king_zone_attack_weight = 0
+
+[evaluation.position]
+enabled = false
+center_control_bonus = 0
+space_bonus = 0
+developed_minor_piece_bonus = 0
+early_queen_move_penalty = 0
+rook_open_file_bonus = 0
+rook_semi_open_file_bonus = 0
+rook_on_seventh_bonus = 0
+connected_rooks_bonus = 0
+knight_outpost_bonus = 0
+bad_bishop_penalty = 0
+
+[evaluation.endgame]
+enabled = false
+phase_transition_material = 0
+king_activity_bonus = 0
+passed_pawn_king_distance_weight = 0
+rook_behind_passed_pawn_bonus = 0
+opposition_bonus = 0
+
+[tactics]
+enabled = false
+quiescence_search = false
+quiescence_max_depth = 0
+search_captures = false
+search_promotions = false
+search_checks = false
+static_exchange_evaluation = false
+delta_pruning = false
+delta_margin_cp = 0
+prefer_winning_captures = false
+avoid_hanging_pieces = false
+
+[strategy]
+enabled = false               # Reserved for future high-level preferences.
+random_move_probability = 1.0 # Reserved for a future hybrid strategy.
+opening_book_enabled = false
+opening_book_path = ""
+opening_book_max_ply = 0
+tablebase_enabled = false
+tablebase_path = ""
+tablebase_max_pieces = 0
+draw_contempt_cp = 0
+prefer_simplification_when_ahead = false
+avoid_repetition_when_ahead = false
+seek_repetition_when_behind = false
+
+[time_management]
+enabled = false
+move_overhead_ms = 50
+minimum_think_ms = 0
+maximum_think_ms = 0
+remaining_time_fraction = 0.0
+increment_fraction = 0.0
+emergency_time_ms = 0
+
+[online]
+enabled = false
+platform = "none"
+protocol = "none"
+accept_challenges = false
+rated_games = false
+concurrent_games = 1
+reconnect_attempts = 0
+
+[diagnostics]
+show_selected_move = true
+show_evaluation = false
+show_principal_variation = false
+show_search_depth = false
+show_node_count = false
+log_positions = false
+log_path = ""

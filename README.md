@@ -13,6 +13,7 @@ interface. Its entire strategy is to choose a random legal move.
 - Enter moves in standard algebraic notation (`e4`, `Nf3`, `Qh5`) or coordinate
   notation (`e2e4`, `g1f3`, `d1h5`)
 - Detect checkmate, stalemate, repetition, insufficient material, and move-rule draws
+- Central `engine.toml` configuration for current and planned engine behavior
 
 ## Run it
 
@@ -41,6 +42,31 @@ ln -s "$(pwd)/scripts/mike-chess" "$HOME/.local/bin/mike-chess"
 
 Set a different size for one launch with, for example,
 `MIKE_CHESS_FONT_SIZE=28 mike-chess`.
+
+## Engine configuration
+
+[`engine.toml`](engine.toml) is the single control file for playing style and
+future tuning. The current active settings are:
+
+```toml
+[engine]
+name = "Random Bot"
+strategy = "random"
+random_seed = -1
+```
+
+`-1` gives a fresh random game each time. Set `random_seed` to a non-negative
+integer when you want repeatable choices for debugging. The remaining sections
+scaffold search, evaluation, material values, positional factors, pawn structure,
+king safety, tactics, strategy, time management, online play, and diagnostics.
+They are intentionally disabled until those ideas are implemented.
+
+Set the `CHESS_BOT_CONFIG` environment variable to experiment with a separate
+configuration without editing the default file.
+
+[`AGENTS.md`](AGENTS.md) is the project handover for future Codex sessions. It
+records the learning objective, current milestone, architecture, design rules,
+and intended development sequence.
 
 During a game, enter `help` to see the available commands. Press `Ctrl+C` at any
 time to return to the main menu.

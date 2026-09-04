@@ -4,12 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "learning-chess-bot"
-version = "0.4.0"
+version = "0.5.0"
 description = "A terminal chess bot built to learn evaluation and search."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "python-chess>=1.999,<2",
+    "tomli>=2.0; python_version < '3.11'",
 ]
 
 [project.scripts]

@@ -7,8 +7,9 @@ import time
 
 import chess
 
-from chess_bot.bot import RandomBot
+from chess_bot.config import ConfigError, EngineConfig, load_engine_config
 from chess_bot.display import clear_screen, render_board
+from chess_bot.engine import create_bot
 from chess_bot.game import InvalidMoveError, move_history, parse_move, result_text
 
 
@@ -104,9 +105,9 @@ def prompt_human_move(board: chess.Board) -> chess.Move | str:
             print(error)
 
 
-def play_human_vs_bot(human_color: chess.Color) -> None:
+def play_human_vs_bot(human_color: chess.Color, config: EngineConfig) -> None:
     board = chess.Board()
-    bot = RandomBot()
+    bot = create_bot(config)
     color_name = "White" if human_color is chess.WHITE else "Black"
     status = f"You are {color_name}."
 
@@ -140,11 +141,11 @@ def play_human_vs_bot(human_color: chess.Color) -> None:
     input("Press Enter to return to the menu…")
 
 
-def watch_bot_match(delay: float | None) -> None:
+def watch_bot_match(delay: float | None, config: EngineConfig) -> None:
     board = chess.Board()
-    white = RandomBot("White Bot")
-    black = RandomBot("Black Bot")
-    status = "Random bot vs random bot"
+    white = create_bot(config, name=f"White {config.name}")
+    black = create_bot(config, name=f"Black {config.name}", seed_offset=1)
+    status = f"{config.strategy.title()} bot vs {config.strategy} bot"
 
     while not board.is_game_over(claim_draw=True):
         draw_game(board, chess.WHITE, status)
@@ -164,10 +165,17 @@ def watch_bot_match(delay: float | None) -> None:
 
 
 def main() -> None:
+    try:
+        config = load_engine_config()
+    except ConfigError as error:
+        print(f"Configuration error: {error}")
+        return
+
     while True:
         clear_screen()
         print(TITLE)
         print("\nLearn chess programming one idea at a time.\n")
+        print(f"Engine: {config.name} [{config.strategy}]")
         print("1. Play against the random bot")
         print("2. Watch random bot vs random bot")
         print("3. Quit")
@@ -175,9 +183,9 @@ def main() -> None:
 
         try:
             if choice in {"1", "play", "p"}:
-                play_human_vs_bot(prompt_human_color())
+                play_human_vs_bot(prompt_human_color(), config)
             elif choice in {"2", "watch", "w"}:
-                watch_bot_match(prompt_spectator_delay())
+                watch_bot_match(prompt_spectator_delay(), config)
             elif choice in {"3", "quit", "q", "exit"}:
                 print("Thanks for playing!")
                 return

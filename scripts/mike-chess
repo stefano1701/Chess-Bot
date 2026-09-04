@@ -28,6 +28,8 @@ done
 SCRIPT_DIRECTORY=$(CDPATH= cd -- "$(dirname -- "$SCRIPT_PATH")" && pwd)
 PROJECT_DIRECTORY=$(CDPATH= cd -- "$SCRIPT_DIRECTORY/.." && pwd)
 GAME_COMMAND="$PROJECT_DIRECTORY/.venv/bin/chess-bot"
+CHESS_BOT_CONFIG="${CHESS_BOT_CONFIG:-$PROJECT_DIRECTORY/engine.toml}"
+export CHESS_BOT_CONFIG
 
 if [ ! -x "$GAME_COMMAND" ]; then
     echo "Chess Bot is not installed. From $PROJECT_DIRECTORY, run:"
