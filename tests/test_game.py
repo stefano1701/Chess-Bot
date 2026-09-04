@@ -9,9 +9,15 @@ class MoveParsingTests(unittest.TestCase):
     def test_parses_uci(self) -> None:
         self.assertEqual(parse_move(chess.Board(), "e2e4"), chess.Move.from_uci("e2e4"))
 
-    def test_rejects_san(self) -> None:
-        with self.assertRaises(InvalidMoveError):
-            parse_move(chess.Board(), "Nf3")
+    def test_parses_san(self) -> None:
+        self.assertEqual(parse_move(chess.Board(), "Nf3"), chess.Move.from_uci("g1f3"))
+
+    def test_parses_queen_move_in_san(self) -> None:
+        board = chess.Board()
+        board.push_san("e4")
+        board.push_san("e5")
+
+        self.assertEqual(parse_move(board, "Qh5"), chess.Move.from_uci("d1h5"))
 
     def test_rejects_illegal_move(self) -> None:
         with self.assertRaises(InvalidMoveError):
@@ -32,7 +38,7 @@ class MoveParsingTests(unittest.TestCase):
         for notation in ("e4", "e5", "Nf3"):
             board.push_san(notation)
 
-        self.assertEqual(move_history(board), "1. e2e4 e7e5  2. g1f3")
+        self.assertEqual(move_history(board), "1. e4 e5  2. Nf3")
 
 
 class ResultTextTests(unittest.TestCase):

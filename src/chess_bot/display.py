@@ -21,20 +21,25 @@ def render_board(board: chess.Board, orientation: chess.Color = chess.WHITE) -> 
         files = list(range(7, -1, -1))
         ranks = list(range(8))
 
-    file_labels = "   " + " ".join(chess.FILE_NAMES[file] for file in files)
-    lines = [file_labels, "  ┌─────────────────┐"]
+    square_width = 3
+    file_labels = "   " + "".join(
+        f"{chess.FILE_NAMES[file]:^{square_width}}" for file in files
+    )
+    horizontal_border = "─" * (len(files) * square_width)
+    lines = [file_labels, f"  ┌{horizontal_border}┐"]
     for rank in ranks:
         cells: list[str] = []
         for file in files:
             square = chess.square(file, rank)
             piece = board.piece_at(square)
             if piece:
-                cells.append(piece.unicode_symbol())
+                symbol = piece.unicode_symbol()
             else:
-                cells.append(EMPTY_DARK if (file + rank) % 2 == 0 else EMPTY_LIGHT)
+                symbol = EMPTY_DARK if (file + rank) % 2 == 0 else EMPTY_LIGHT
+            cells.append(f"{symbol:^{square_width}}")
         label = str(rank + 1)
-        lines.append(f"{label} │ {' '.join(cells)} │ {label}")
-    lines.extend(["  └─────────────────┘", file_labels])
+        lines.append(f"{label} │{''.join(cells)}│ {label}")
+    lines.extend([f"  └{horizontal_border}┘", file_labels])
     return "\n".join(lines)
 
 

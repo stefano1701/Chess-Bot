@@ -9,7 +9,8 @@ interface. Its entire strategy is to choose a random legal move.
 - Play against the bot as White or Black
 - Watch two random-move bots play each other
 - Unicode board that rotates to the human player's point of view
-- Enter moves in simple UCI notation (`e2e4`, `g1f3`, `e7e8q`)
+- Enter moves in standard algebraic notation (`e4`, `Nf3`, `Qh5`) or coordinate
+  notation (`e2e4`, `g1f3`, `d1h5`)
 - Detect checkmate, stalemate, repetition, insufficient material, and move-rule draws
 
 ## Run it
@@ -32,8 +33,11 @@ python -m chess_bot
 During a game, enter `help` to see the available commands. Press `Ctrl+C` at any
 time to return to the main menu.
 
-Castling is entered as the king's move (`e1g1` or `e1c1` for White), and a pawn
-promotion adds the new piece at the end (`e7e8q`).
+Castling can be entered as `O-O` or `O-O-O`. Pawn promotion is written as `e8=Q`.
+The coordinate equivalents (`e1g1` and `e7e8q`) continue to work too.
+
+The size of Unicode chess pieces is controlled by your terminal font. On macOS,
+`Command` + `+` usually enlarges the entire board.
 
 ## Test it
 

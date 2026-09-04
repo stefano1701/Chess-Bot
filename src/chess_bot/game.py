@@ -10,16 +10,21 @@ class InvalidMoveError(ValueError):
 
 
 def parse_move(board: chess.Board, text: str) -> chess.Move:
-    """Parse a legal move in UCI notation, such as ``e2e4`` or ``e7e8q``."""
+    """Parse a legal move in algebraic or UCI coordinate notation."""
     notation = text.strip()
     if not notation:
-        raise InvalidMoveError("Enter a move, such as e2e4 or g1f3.")
+        raise InvalidMoveError("Enter a move, such as e4, Qh5, or e2e4.")
+
+    try:
+        return board.parse_san(notation)
+    except ValueError:
+        pass
 
     try:
         move = chess.Move.from_uci(notation.lower())
     except ValueError as error:
         raise InvalidMoveError(
-            f"I couldn't understand {notation!r}. Use UCI notation, such as e2e4."
+            f"I couldn't understand {notation!r}. Try Qh5 or d1h5."
         ) from error
 
     if move not in board.legal_moves:
@@ -55,8 +60,13 @@ def result_text(board: chess.Board) -> str:
 
 
 def move_history(board: chess.Board, max_full_moves: int = 6) -> str:
-    """Format the latest moves as compact, numbered UCI move pairs."""
-    moves = [move.uci() for move in board.move_stack]
+    """Format the latest moves as compact, numbered algebraic move pairs."""
+    replay = board.root()
+    moves: list[str] = []
+    for move in board.move_stack:
+        moves.append(replay.san(move))
+        replay.push(move)
+
     pairs = [
         f"{index // 2 + 1}. {moves[index]}"
         + (f" {moves[index + 1]}" if index + 1 < len(moves) else "")

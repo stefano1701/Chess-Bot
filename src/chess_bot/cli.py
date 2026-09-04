@@ -66,10 +66,9 @@ def prompt_spectator_delay() -> float | None:
 
 def print_help() -> None:
     print(
-        "\nMove format:\n"
-        "  Enter the start and end squares: e2e4 or g1f3\n"
-        "  Castle by moving the king: e1g1 or e1c1\n"
-        "  Add a promotion piece at the end: e7e8q\n\n"
+        "\nMove formats:\n"
+        "  Algebraic: e4, Nf3, Qh5, Bxe6, O-O, e8=Q\n"
+        "  Coordinates also work: e2e4, g1f3, d1h5, e7e8q\n\n"
         "Commands:\n"
         "  moves   list every legal move\n"
         "  board   redraw the board\n"
@@ -82,7 +81,7 @@ def print_help() -> None:
 def prompt_human_move(board: chess.Board) -> chess.Move | str:
     """Prompt until a move or an in-game command is supplied."""
     while True:
-        answer = input("Your move (e.g. e2e4) › ").strip()
+        answer = input("Your move (e.g. e4 or Qh5) › ").strip()
         command = answer.lower()
 
         if command in {"quit", "q", "exit"}:
@@ -95,7 +94,7 @@ def prompt_human_move(board: chess.Board) -> chess.Move | str:
         if command in {"board", "b"}:
             return "redraw"
         if command in {"moves", "legal"}:
-            legal_moves = sorted(move.uci() for move in board.legal_moves)
+            legal_moves = sorted(board.san(move) for move in board.legal_moves)
             print("Legal moves: " + ", ".join(legal_moves))
             continue
 
@@ -128,12 +127,12 @@ def play_human_vs_bot(human_color: chess.Color) -> None:
                 continue
             move = action
             assert isinstance(move, chess.Move)
-            notation = move.uci()
+            notation = board.san(move)
             board.push(move)
             status = f"You played {notation}."
         else:
             move = bot.choose_move(board)
-            notation = move.uci()
+            notation = board.san(move)
             board.push(move)
             status = f"{bot.name} played {notation}."
 
@@ -156,7 +155,7 @@ def watch_bot_match(delay: float | None) -> None:
             time.sleep(delay)
 
         move = bot.choose_move(board)
-        notation = move.uci()
+        notation = board.san(move)
         board.push(move)
         status = f"{bot.name} played {notation}."
 
