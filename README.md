@@ -8,7 +8,8 @@ interface. Its entire strategy is to choose a random legal move.
 
 - Play against the bot as White or Black
 - Watch two random-move bots play each other
-- Unicode board that rotates to the human player's point of view
+- Filled Unicode checkerboard with white and shaded squares, rotated to the
+  human player's point of view
 - Enter moves in standard algebraic notation (`e4`, `Nf3`, `Qh5`) or coordinate
   notation (`e2e4`, `g1f3`, `d1h5`)
 - Detect checkmate, stalemate, repetition, insufficient material, and move-rule draws
