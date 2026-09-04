@@ -31,6 +31,17 @@ You can also start it with:
 python -m chess_bot
 ```
 
+On macOS, the included `scripts/mike-chess` launcher temporarily enlarges the
+current Terminal tab to 24-point text, then restores its previous font size when
+the game exits. Install the personal command with:
+
+```bash
+ln -s "$(pwd)/scripts/mike-chess" "$HOME/.local/bin/mike-chess"
+```
+
+Set a different size for one launch with, for example,
+`MIKE_CHESS_FONT_SIZE=28 mike-chess`.
+
 During a game, enter `help` to see the available commands. Press `Ctrl+C` at any
 time to return to the main menu.
 
@@ -38,7 +49,8 @@ Castling can be entered as `O-O` or `O-O-O`. Pawn promotion is written as `e8=Q`
 The coordinate equivalents (`e1g1` and `e7e8q`) continue to work too.
 
 The size of Unicode chess pieces is controlled by your terminal font. On macOS,
-`Command` + `+` usually enlarges the entire board.
+the `mike-chess` launcher handles that automatically. `Command` + `+` can still
+be used to adjust it manually.
 
 ## Test it
 

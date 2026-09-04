@@ -1,0 +1,72 @@
+#!/bin/sh
+
+# Personal launcher for the terminal game. macOS Terminal is enlarged only for
+# the duration of the game; other terminal applications simply run the game.
+
+set -u
+
+TARGET_FONT_SIZE="${MIKE_CHESS_FONT_SIZE:-24}"
+case "$TARGET_FONT_SIZE" in
+    ""|*[!0-9]*)
+        echo "MIKE_CHESS_FONT_SIZE must be a whole number."
+        exit 1
+        ;;
+esac
+
+# Resolve this script's real location even when it is reached through the
+# ~/.local/bin/mike-chess symbolic link.
+SCRIPT_PATH=$0
+while [ -L "$SCRIPT_PATH" ]; do
+    SCRIPT_DIRECTORY=$(CDPATH= cd -- "$(dirname -- "$SCRIPT_PATH")" && pwd)
+    LINK_TARGET=$(readlink "$SCRIPT_PATH")
+    case "$LINK_TARGET" in
+        /*) SCRIPT_PATH=$LINK_TARGET ;;
+        *) SCRIPT_PATH=$SCRIPT_DIRECTORY/$LINK_TARGET ;;
+    esac
+done
+
+SCRIPT_DIRECTORY=$(CDPATH= cd -- "$(dirname -- "$SCRIPT_PATH")" && pwd)
+PROJECT_DIRECTORY=$(CDPATH= cd -- "$SCRIPT_DIRECTORY/.." && pwd)
+GAME_COMMAND="$PROJECT_DIRECTORY/.venv/bin/chess-bot"
+
+if [ ! -x "$GAME_COMMAND" ]; then
+    echo "Chess Bot is not installed. From $PROJECT_DIRECTORY, run:"
+    echo "  python3 -m venv .venv && .venv/bin/python -m pip install -e ."
+    exit 1
+fi
+
+ORIGINAL_FONT_SIZE=""
+FONT_WAS_CHANGED=0
+
+restore_terminal_font() {
+    if [ "$FONT_WAS_CHANGED" -eq 1 ]; then
+        /usr/bin/osascript -e \
+            "tell application \"Terminal\" to set font size of selected tab of front window to $ORIGINAL_FONT_SIZE" \
+            >/dev/null 2>&1 || true
+    fi
+}
+
+trap restore_terminal_font EXIT
+
+if [ "${TERM_PROGRAM:-}" = "Apple_Terminal" ]; then
+    ORIGINAL_FONT_SIZE=$(
+        /usr/bin/osascript -e \
+            'tell application "Terminal" to get font size of selected tab of front window' \
+            2>/dev/null
+    ) || ORIGINAL_FONT_SIZE=""
+
+    case "$ORIGINAL_FONT_SIZE" in
+        ""|*[!0-9]*) ORIGINAL_FONT_SIZE="" ;;
+        *)
+            if [ "$ORIGINAL_FONT_SIZE" -lt "$TARGET_FONT_SIZE" ]; then
+                if /usr/bin/osascript -e \
+                    "tell application \"Terminal\" to set font size of selected tab of front window to $TARGET_FONT_SIZE" \
+                    >/dev/null 2>&1; then
+                    FONT_WAS_CHANGED=1
+                fi
+            fi
+            ;;
+    esac
+fi
+
+"$GAME_COMMAND"
