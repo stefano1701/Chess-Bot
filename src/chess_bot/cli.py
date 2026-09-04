@@ -7,7 +7,14 @@ import time
 
 import chess
 
-from chess_bot.config import ConfigError, EngineConfig, load_engine_config
+from chess_bot.config import (
+    BotProfile,
+    ConfigError,
+    EngineConfig,
+    MaterialValues,
+    load_engine_config,
+    save_material_profile,
+)
 from chess_bot.display import clear_screen, render_board
 from chess_bot.engine import create_bot
 from chess_bot.game import InvalidMoveError, move_history, parse_move, result_text
@@ -65,6 +72,87 @@ def prompt_spectator_delay() -> float | None:
         print("The delay cannot be negative.")
 
 
+def profile_summary(profile: BotProfile) -> str:
+    if profile.strategy == "random":
+        return f"{profile.name} — random moves"
+
+    values = profile.material
+    return (
+        f"{profile.name} — one ply; "
+        f"P={values.pawn} N={values.knight} B={values.bishop} "
+        f"R={values.rook} Q={values.queen}"
+    )
+
+
+def prompt_bot_profile(config: EngineConfig, heading: str) -> BotProfile | None:
+    default = config.default_profile
+    others = sorted(
+        (
+            profile
+            for profile in config.profiles.values()
+            if profile.id != default.id
+        ),
+        key=lambda profile: profile.name.lower(),
+    )
+    profiles = [default, *others]
+
+    while True:
+        print(f"\n{heading}")
+        for index, profile in enumerate(profiles, start=1):
+            default_marker = " (default)" if profile.id == default.id else ""
+            print(f"{index}. {profile_summary(profile)}{default_marker}")
+        answer = input("Choose a profile, or Q to cancel › ").strip().lower()
+        if answer in {"q", "quit", "cancel"}:
+            return None
+        if answer == "":
+            return default
+        try:
+            selected_index = int(answer) - 1
+        except ValueError:
+            print("Choose one of the listed profile numbers.")
+            continue
+        if 0 <= selected_index < len(profiles):
+            return profiles[selected_index]
+        print("Choose one of the listed profile numbers.")
+
+
+def create_material_profile_interactively(config: EngineConfig) -> str | None:
+    clear_screen()
+    print(TITLE)
+    print("\nCreate a one-ply material bot profile\n")
+    name = input("Profile name (blank to cancel) › ").strip()
+    if not name:
+        return None
+
+    defaults = config.default_material
+    print("Enter whole-number centipawn values, or press Enter for the default.")
+    material = MaterialValues(
+        pawn=_prompt_piece_value("Pawn", defaults.pawn),
+        knight=_prompt_piece_value("Knight", defaults.knight),
+        bishop=_prompt_piece_value("Bishop", defaults.bishop),
+        rook=_prompt_piece_value("Rook", defaults.rook),
+        queen=_prompt_piece_value("Queen", defaults.queen),
+        king=0,
+    )
+    profile_path = save_material_profile(config, name, material)
+    return profile_path.stem
+
+
+def _prompt_piece_value(piece_name: str, default: int) -> int:
+    while True:
+        answer = input(f"{piece_name} [{default}] › ").strip()
+        if answer == "":
+            return default
+        try:
+            value = int(answer)
+        except ValueError:
+            print("Enter a non-negative whole number.")
+            continue
+        if value >= 0:
+            return value
+        print("Enter a non-negative whole number.")
+
+
 def print_help() -> None:
     print(
         "\nMove formats:\n"
@@ -105,11 +193,15 @@ def prompt_human_move(board: chess.Board) -> chess.Move | str:
             print(error)
 
 
-def play_human_vs_bot(human_color: chess.Color, config: EngineConfig) -> None:
+def play_human_vs_bot(
+    human_color: chess.Color,
+    config: EngineConfig,
+    profile: BotProfile,
+) -> None:
     board = chess.Board()
-    bot = create_bot(config)
+    bot = create_bot(config, profile.id)
     color_name = "White" if human_color is chess.WHITE else "Black"
-    status = f"You are {color_name}."
+    status = f"You are {color_name}. Opponent: {profile.name}."
 
     while not board.is_game_over(claim_draw=True):
         draw_game(board, human_color, status)
@@ -141,11 +233,21 @@ def play_human_vs_bot(human_color: chess.Color, config: EngineConfig) -> None:
     input("Press Enter to return to the menu…")
 
 
-def watch_bot_match(delay: float | None, config: EngineConfig) -> None:
+def watch_bot_match(
+    delay: float | None,
+    config: EngineConfig,
+    white_profile: BotProfile,
+    black_profile: BotProfile,
+) -> None:
     board = chess.Board()
-    white = create_bot(config, name=f"White {config.name}")
-    black = create_bot(config, name=f"Black {config.name}", seed_offset=1)
-    status = f"{config.strategy.title()} bot vs {config.strategy} bot"
+    white = create_bot(config, white_profile.id, name=white_profile.name)
+    black = create_bot(
+        config,
+        black_profile.id,
+        name=black_profile.name,
+        seed_offset=1,
+    )
+    status = f"White: {white_profile.name}  |  Black: {black_profile.name}"
 
     while not board.is_game_over(claim_draw=True):
         draw_game(board, chess.WHITE, status)
@@ -175,18 +277,37 @@ def main() -> None:
         clear_screen()
         print(TITLE)
         print("\nLearn chess programming one idea at a time.\n")
-        print(f"Engine: {config.name} [{config.strategy}]")
-        print("1. Play against the random bot")
-        print("2. Watch random bot vs random bot")
-        print("3. Quit")
+        print(f"Default: {profile_summary(config.default_profile)}")
+        print("1. Play against a bot")
+        print("2. Watch bot vs bot")
+        print("3. Create a material bot profile")
+        print("4. Quit")
         choice = input("\nChoose an option › ").strip().lower()
 
         try:
             if choice in {"1", "play", "p"}:
-                play_human_vs_bot(prompt_human_color(), config)
+                profile = prompt_bot_profile(config, "Choose your opponent")
+                if profile is not None:
+                    play_human_vs_bot(prompt_human_color(), config, profile)
             elif choice in {"2", "watch", "w"}:
-                watch_bot_match(prompt_spectator_delay(), config)
-            elif choice in {"3", "quit", "q", "exit"}:
+                white_profile = prompt_bot_profile(config, "Choose White's profile")
+                if white_profile is None:
+                    continue
+                black_profile = prompt_bot_profile(config, "Choose Black's profile")
+                if black_profile is not None:
+                    watch_bot_match(
+                        prompt_spectator_delay(),
+                        config,
+                        white_profile,
+                        black_profile,
+                    )
+            elif choice in {"3", "create", "c"}:
+                profile_id = create_material_profile_interactively(config)
+                if profile_id is not None:
+                    config = load_engine_config(config.source)
+                    print(f"\nCreated: {profile_summary(config.get_profile(profile_id))}")
+                    input("Press Enter to return to the menu…")
+            elif choice in {"4", "quit", "q", "exit"}:
                 print("Thanks for playing!")
                 return
         except (KeyboardInterrupt, EOFError):

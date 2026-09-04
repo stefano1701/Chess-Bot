@@ -1,0 +1,13 @@
+[profile]
+name = "Equal Minor Pieces"
+strategy = "one_ply"
+description = "Values knights and bishops equally at three pawns each."
+random_seed = -1
+
+[material]
+pawn = 100
+knight = 300
+bishop = 300
+rook = 500
+queen = 900
+king = 0

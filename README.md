@@ -1,19 +1,20 @@
 # Chess Bot
 
 A deliberately simple chess bot for learning how chess engines evaluate positions
-and search game trees. The first version focuses on a clean, playable terminal
-interface. Its entire strategy is to choose a random legal move.
+and search game trees. It now includes a random baseline and the first real search
+stage: choosing the move with the best immediate material result.
 
 ## Current features
 
-- Play against the bot as White or Black
-- Watch two random-move bots play each other
+- Play against a selected bot profile as White or Black
+- Watch two independently selected profiles play each other
+- Create material-value profiles from the terminal menu
 - Filled Unicode checkerboard with white and shaded squares, rotated to the
   human player's point of view
 - Enter moves in standard algebraic notation (`e4`, `Nf3`, `Qh5`) or coordinate
   notation (`e2e4`, `g1f3`, `d1h5`)
 - Detect checkmate, stalemate, repetition, insufficient material, and move-rule draws
-- Central `engine.toml` configuration for current and planned engine behavior
+- Central `engine.toml` configuration plus individual profile files
 
 ## Run it
 
@@ -45,21 +46,33 @@ Set a different size for one launch with, for example,
 
 ## Engine configuration
 
-[`engine.toml`](engine.toml) is the single control file for playing style and
-future tuning. The current active settings are:
+[`engine.toml`](engine.toml) controls shared engine behavior and points to the
+[`profiles`](profiles) directory. The default is the one-ply material bot:
 
 ```toml
 [engine]
-name = "Random Bot"
-strategy = "random"
-random_seed = -1
+default_profile = "standard-material"
+profiles_directory = "profiles"
 ```
 
-`-1` gives a fresh random game each time. Set `random_seed` to a non-negative
-integer when you want repeatable choices for debugging. The remaining sections
-scaffold search, evaluation, material values, positional factors, pawn structure,
-king safety, tactics, strategy, time management, online play, and diagnostics.
-They are intentionally disabled until those ideas are implemented.
+Three profiles are included:
+
+- **Random Bot:** chooses any legal move uniformly.
+- **Standard Material:** `P=100, N=320, B=330, R=500, Q=900`.
+- **Equal Minor Pieces:** `P=100, N=300, B=300, R=500, Q=900`.
+
+The two material bots inspect every legal move, evaluate the resulting material,
+and select the best score. They do not yet examine the opponent's reply. Equal
+best moves are selected randomly.
+
+Choose **Create a material bot profile** in the main menu to enter another set of
+values. Each custom profile is saved as an editable TOML file in `profiles/` and
+automatically appears in the play and spectator selection menus.
+
+Each profile also has a `random_seed`: `-1` gives fresh tie-breaking choices,
+while a non-negative integer makes them repeatable. The remaining global sections
+scaffold positional evaluation, deeper search, tactics, time management, online
+play, and diagnostics.
 
 Set the `CHESS_BOT_CONFIG` environment variable to experiment with a separate
 configuration without editing the default file.
@@ -86,8 +99,8 @@ python -m unittest discover -s tests
 
 ## Planned learning path
 
-1. Replace random moves with a material-only evaluation.
-2. Add minimax search.
+1. Material-only one-ply evaluation (current).
+2. Add negamax/minimax search so the bot examines opponent replies.
 3. Add alpha-beta pruning and move ordering.
 4. Expand positional evaluation (piece-square tables, pawn structure, mobility,
    king safety, and more).

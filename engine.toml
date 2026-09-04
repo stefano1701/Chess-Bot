@@ -1,8 +1,8 @@
 # Chess Bot engine configuration
 #
 # This is the single place for selecting engine behavior and tuning chess
-# knowledge. Only the [engine] random strategy is active today. Every other
-# section is disabled until its feature is implemented and tested.
+# knowledge. Bot-specific choices live in profiles/*.toml; this file supplies
+# shared defaults and future-facing switches.
 
 [meta]
 schema_version = 1
@@ -10,17 +10,16 @@ config_name = "learning-defaults"
 score_unit = "centipawns"
 
 [engine]
-name = "Random Bot"
-strategy = "random"          # The only currently supported strategy.
-random_seed = -1             # -1 = fresh randomness; 0 or higher = repeatable.
+default_profile = "standard-material"
+profiles_directory = "profiles"
 threads = 1                  # Reserved for future search.
 hash_size_mb = 16            # Reserved for a future transposition table.
 ponder = false
 
 [search]
-enabled = false
-algorithm = "none"           # Future values: one_ply, negamax, alpha_beta.
-max_depth = 0
+enabled = true
+algorithm = "one_ply"        # Material profiles currently search one ply.
+max_depth = 1
 iterative_deepening = false
 time_limit_ms = 0             # 0 = no search clock.
 node_limit = 0                # 0 = unlimited.
@@ -43,14 +42,14 @@ recaptures = 0
 passed_pawns = 0
 
 [evaluation]
-enabled = false
+enabled = true
 perspective = "white"        # Positive scores will mean White is better.
 mate_score = 100000
 draw_score = 0
 tempo_bonus = 0
 
 [evaluation.weights]
-material = 0.0
+material = 1.0
 piece_square_tables = 0.0
 mobility = 0.0
 pawn_structure = 0.0
@@ -60,7 +59,7 @@ development = 0.0
 endgame = 0.0
 
 [evaluation.material]
-enabled = false
+enabled = true
 pawn = 100
 knight = 320
 bishop = 330

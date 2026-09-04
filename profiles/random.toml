@@ -1,0 +1,5 @@
+[profile]
+name = "Random Bot"
+strategy = "random"
+description = "Chooses uniformly from all legal moves."
+random_seed = -1

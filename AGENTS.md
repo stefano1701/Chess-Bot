@@ -15,17 +15,20 @@ to a mature engine or hide the interesting decisions behind an external engine.
 
 ## Current milestone
 
-Version: 0.5.0
+Version: 0.6.0
 
-The only implemented strategy is `random`. On its turn the bot chooses uniformly
-from the legal moves supplied by `python-chess`. There is no evaluation function,
-search tree, tactical search, opening book, tablebase, clock management, or online
-adapter yet.
+Two strategies are implemented: `random` and `one_ply`. The one-ply strategy
+examines every legal move, evaluates the resulting material from White's
+perspective, and chooses the best immediate score for the moving side. It detects
+immediate mate and draw outcomes, but it does not examine the opponent's reply.
+There is no positional evaluation, deeper tree search, tactical/quiescence search,
+opening book, tablebase, clock management, or online adapter yet.
 
 The terminal application currently supports:
 
-- Human vs bot, with White, Black, or random colour selection.
-- Random bot vs random bot spectator mode.
+- Human vs a selected bot profile, with White, Black, or random colour selection.
+- Bot vs bot spectator mode with separate White and Black profiles.
+- Interactive creation of one-ply material profiles.
 - SAN input such as `e4`, `Nf3`, `Qh5`, and `O-O`.
 - UCI coordinate input such as `e2e4`, `g1f3`, and `e7e8q`.
 - A Unicode board with white and shaded squares, rotated for a Black player.
@@ -36,11 +39,14 @@ The terminal application currently supports:
 ## Source map
 
 - `engine.toml`: the single source of truth for engine behavior and future
-  tuning values. Read it before doing engine work.
-- `src/chess_bot/config.py`: loads and validates `engine.toml`.
+  shared tuning values. Read it before doing engine work.
+- `profiles/*.toml`: bot names, strategies, seeds, and optional material-value
+  overrides. Standard Material and Equal Minor Pieces are included examples.
+- `src/chess_bot/config.py`: loads, validates, and creates profiles.
 - `src/chess_bot/engine.py`: constructs the selected engine implementation.
   Add future strategies here rather than branching in the terminal UI.
-- `src/chess_bot/bot.py`: contains the current `RandomBot` implementation.
+- `src/chess_bot/bot.py`: contains `RandomBot` and `OnePlyMaterialBot`.
+- `src/chess_bot/evaluation.py`: terminal-outcome and material evaluation.
 - `src/chess_bot/game.py`: move parsing, move history, and result formatting.
 - `src/chess_bot/display.py`: Unicode and terminal-colour board rendering.
 - `src/chess_bot/cli.py`: menus and interactive game loops only.
@@ -51,12 +57,13 @@ The terminal application currently supports:
 ## Configuration contract
 
 `engine.toml` deliberately contains settings for planned work as well as the
-current random strategy. Settings under disabled sections are documentation and
+current one-ply search. Settings under disabled sections are documentation and
 tuning placeholders; they must not affect play until the corresponding feature
-is implemented and its section is enabled.
+is implemented and its section is enabled. Bot-specific settings belong in
+`profiles/*.toml`.
 
-The active strategy is selected by `engine.strategy`. At present, validation
-accepts only `random`. When adding a strategy:
+The menu selects a profile, and each profile selects `profile.strategy`. At
+present, validation accepts `random` and `one_ply`. When adding a strategy:
 
 1. Implement it behind the same `choose_move(board)` boundary used by
    `RandomBot`.
@@ -65,9 +72,10 @@ accepts only `random`. When adding a strategy:
 4. Enable and tune the relevant `engine.toml` sections.
 5. Add deterministic unit tests and update this file and the README.
 
-`engine.random_seed = -1` means fresh system randomness. A non-negative integer
-makes random choices reproducible for debugging and tests. `CHESS_BOT_CONFIG` may
-point to an alternate TOML file.
+`profile.random_seed = -1` means fresh system randomness. A non-negative integer
+makes random moves and equal-score tie breaking reproducible. `CHESS_BOT_CONFIG`
+may point to an alternate global TOML file; its profiles directory is resolved
+relative to that file.
 
 ## Design rules
 
@@ -90,8 +98,8 @@ point to an alternate TOML file.
 
 ## Intended learning sequence
 
-1. Random legal moves (current).
-2. Material evaluation with one-ply move selection.
+1. Random legal moves (complete).
+2. Material evaluation with one-ply move selection and profiles (current).
 3. Negamax/minimax search to a fixed depth.
 4. Alpha-beta pruning and basic move ordering.
 5. Quiescence search for tactical stability.
