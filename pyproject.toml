@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "learning-chess-bot"
+version = "0.1.0"
+description = "A terminal chess bot built to learn evaluation and search."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "python-chess>=1.999,<2",
+]
+
+[project.scripts]
+chess-bot = "chess_bot.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
