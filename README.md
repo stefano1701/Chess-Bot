@@ -8,6 +8,8 @@ stage: choosing the move with the best immediate material result.
 
 - Play against a selected bot profile as White or Black
 - Watch two independently selected profiles play each other
+- Run headless multi-game tournaments with alternating colours, a live progress
+  bar, and overall/White/Black statistics for each profile
 - Create material-value profiles from the terminal menu
 - Filled Unicode checkerboard with white and shaded squares, rotated to the
   human player's point of view
@@ -67,12 +69,22 @@ best moves are selected randomly.
 
 Choose **Create a material bot profile** in the main menu to enter another set of
 values. Each custom profile is saved as an editable TOML file in `profiles/` and
-automatically appears in the play and spectator selection menus.
+automatically appears in the play, spectator, and tournament selection menus.
+
+Choose **Run a bot tournament** to compare two different profiles over multiple
+games. Select the game count and each profile's colour for game 1; the profiles
+then swap colours after every game. Tournament boards are not drawn. The terminal
+instead shows a live progress bar and each profile's wins, draws, losses, win
+percentage, and chess score percentage, both overall and split by colour. The
+final report also shows White/Black results, average game length, and how games
+ended. With an odd game count, the first profile selected receives one extra game
+as White.
 
 Each profile also has a `random_seed`: `-1` gives fresh tie-breaking choices,
 while a non-negative integer makes them repeatable. The remaining global sections
 scaffold positional evaluation, deeper search, tactics, time management, online
-play, and diagnostics.
+play, and diagnostics. The `[tournament]` section controls the default game count
+and progress-bar width; colour alternation is required.
 
 Set the `CHESS_BOT_CONFIG` environment variable to experiment with a separate
 configuration without editing the default file.

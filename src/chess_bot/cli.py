@@ -18,6 +18,7 @@ from chess_bot.config import (
 from chess_bot.display import clear_screen, render_board
 from chess_bot.engine import create_bot
 from chess_bot.game import InvalidMoveError, move_history, parse_move, result_text
+from chess_bot.tournament import ResultBreakdown, TournamentResult, run_tournament
 
 
 TITLE = "♔  CHESS BOT  ♚"
@@ -84,7 +85,11 @@ def profile_summary(profile: BotProfile) -> str:
     )
 
 
-def prompt_bot_profile(config: EngineConfig, heading: str) -> BotProfile | None:
+def prompt_bot_profile(
+    config: EngineConfig,
+    heading: str,
+    excluded_profile_id: str | None = None,
+) -> BotProfile | None:
     default = config.default_profile
     others = sorted(
         (
@@ -100,7 +105,13 @@ def prompt_bot_profile(config: EngineConfig, heading: str) -> BotProfile | None:
         print(f"\n{heading}")
         for index, profile in enumerate(profiles, start=1):
             default_marker = " (default)" if profile.id == default.id else ""
-            print(f"{index}. {profile_summary(profile)}{default_marker}")
+            unavailable_marker = (
+                " (already selected)" if profile.id == excluded_profile_id else ""
+            )
+            print(
+                f"{index}. {profile_summary(profile)}"
+                f"{default_marker}{unavailable_marker}"
+            )
         answer = input("Choose a profile, or Q to cancel › ").strip().lower()
         if answer in {"q", "quit", "cancel"}:
             return None
@@ -112,8 +123,163 @@ def prompt_bot_profile(config: EngineConfig, heading: str) -> BotProfile | None:
             print("Choose one of the listed profile numbers.")
             continue
         if 0 <= selected_index < len(profiles):
-            return profiles[selected_index]
+            selected = profiles[selected_index]
+            if selected.id == excluded_profile_id:
+                print("Choose a different profile for the other player.")
+                continue
+            return selected
         print("Choose one of the listed profile numbers.")
+
+
+def prompt_tournament_game_count(default: int) -> int | None:
+    while True:
+        answer = input(f"Number of games [{default}], or Q to cancel › ").strip().lower()
+        if answer in {"q", "quit", "cancel"}:
+            return None
+        if answer == "":
+            return default
+        try:
+            games = int(answer)
+        except ValueError:
+            print("Enter a positive whole number.")
+            continue
+        if games > 0:
+            return games
+        print("Enter a positive whole number.")
+
+
+def format_tournament_progress(
+    result: TournamentResult,
+    progress_bar_width: int,
+    *,
+    final: bool = False,
+) -> str:
+    """Build the progress-only tournament screen (never a chess board)."""
+    completed = result.games_completed
+    requested = result.games_requested
+    proportion = completed / requested
+    filled = min(progress_bar_width, int(proportion * progress_bar_width))
+    bar = "█" * filled + "░" * (progress_bar_width - filled)
+    heading = "TOURNAMENT COMPLETE" if final else "BOT TOURNAMENT"
+    lines = [
+        heading,
+        "",
+        (
+            f"Game {completed} of {requested}  [{bar}] "
+            f"{proportion * 100:5.1f}%"
+        ),
+        (
+            f"Game 1: {result.first_white.name} as White | "
+            f"{result.first_black.name} as Black"
+        ),
+        "Colours alternate after every game.",
+        "",
+        "Profile results",
+    ]
+
+    for profile_id in (result.first_white.id, result.first_black.id):
+        stats = result.profile_stats[profile_id]
+        lines.extend(
+            [
+                _format_result_line(stats.profile.name, stats.overall),
+                _format_result_line("  as White", stats.as_white),
+                _format_result_line("  as Black", stats.as_black),
+            ]
+        )
+
+    if final:
+        lines.extend(
+            [
+                "",
+                "Tournament totals",
+                (
+                    f"White wins: {result.white_wins} "
+                    f"({_percentage(result.white_wins, completed):.1f}%) | "
+                    f"Black wins: {result.black_wins} "
+                    f"({_percentage(result.black_wins, completed):.1f}%) | "
+                    f"Draws: {result.draws} "
+                    f"({_percentage(result.draws, completed):.1f}%)"
+                ),
+                f"Average game length: {result.average_plies:.1f} half-moves",
+            ]
+        )
+        if result.terminations:
+            endings = ", ".join(
+                f"{name}: {count}"
+                for name, count in sorted(result.terminations.items())
+            )
+            lines.append(f"Endings: {endings}")
+
+    return "\n".join(lines)
+
+
+def _format_result_line(label: str, results: ResultBreakdown) -> str:
+    games_label = "game" if results.games == 1 else "games"
+    return (
+        f"{label}: {results.games} {games_label} | "
+        f"W {results.wins}  D {results.draws}  L {results.losses} | "
+        f"win {results.win_percentage:5.1f}% | "
+        f"score {results.score_percentage:5.1f}%"
+    )
+
+
+def _percentage(amount: int, total: int) -> float:
+    return 100.0 * amount / total if total else 0.0
+
+
+def display_tournament_progress(
+    result: TournamentResult,
+    progress_bar_width: int,
+    *,
+    final: bool = False,
+) -> None:
+    clear_screen()
+    print(TITLE)
+    print()
+    print(
+        format_tournament_progress(
+            result,
+            progress_bar_width,
+            final=final,
+        )
+    )
+
+
+def run_bot_tournament_interactively(config: EngineConfig) -> None:
+    clear_screen()
+    print(TITLE)
+    print("\nBot tournament setup")
+    games = prompt_tournament_game_count(config.tournament_default_games)
+    if games is None:
+        return
+
+    first_white = prompt_bot_profile(config, "Choose White for game 1")
+    if first_white is None:
+        return
+    first_black = prompt_bot_profile(
+        config,
+        "Choose Black for game 1",
+        excluded_profile_id=first_white.id,
+    )
+    if first_black is None:
+        return
+
+    result = run_tournament(
+        config,
+        first_white.id,
+        first_black.id,
+        games,
+        progress_callback=lambda progress: display_tournament_progress(
+            progress,
+            config.tournament_progress_bar_width,
+        ),
+    )
+    display_tournament_progress(
+        result,
+        config.tournament_progress_bar_width,
+        final=True,
+    )
+    input("\nPress Enter to return to the menu…")
 
 
 def create_material_profile_interactively(config: EngineConfig) -> str | None:
@@ -281,7 +447,8 @@ def main() -> None:
         print("1. Play against a bot")
         print("2. Watch bot vs bot")
         print("3. Create a material bot profile")
-        print("4. Quit")
+        print("4. Run a bot tournament")
+        print("5. Quit")
         choice = input("\nChoose an option › ").strip().lower()
 
         try:
@@ -307,7 +474,9 @@ def main() -> None:
                     config = load_engine_config(config.source)
                     print(f"\nCreated: {profile_summary(config.get_profile(profile_id))}")
                     input("Press Enter to return to the menu…")
-            elif choice in {"4", "quit", "q", "exit"}:
+            elif choice in {"4", "tournament", "t"}:
+                run_bot_tournament_interactively(config)
+            elif choice in {"5", "quit", "q", "exit"}:
                 print("Thanks for playing!")
                 return
         except (KeyboardInterrupt, EOFError):

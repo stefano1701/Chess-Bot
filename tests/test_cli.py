@@ -14,6 +14,7 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10 compatibility.
 from chess_bot.cli import (
     create_material_profile_interactively,
     prompt_bot_profile,
+    prompt_tournament_game_count,
 )
 from chess_bot.config import load_engine_config
 
@@ -55,6 +56,30 @@ class ProfileMenuTests(unittest.TestCase):
         self.assertEqual(profile_data["material"]["bishop"], 300)
         self.assertEqual(profile_data["material"]["rook"], 500)
         self.assertEqual(profile_data["material"]["queen"], 900)
+
+    def test_tournament_game_count_rejects_invalid_input(self) -> None:
+        with (
+            patch("builtins.input", side_effect=["zero", "0", "7"]),
+            redirect_stdout(StringIO()),
+        ):
+            games = prompt_tournament_game_count(20)
+
+        self.assertEqual(games, 7)
+
+    def test_tournament_profile_must_differ_from_first_selection(self) -> None:
+        config = load_engine_config()
+        with (
+            patch("builtins.input", side_effect=["1", "2"]),
+            redirect_stdout(StringIO()) as output,
+        ):
+            selected = prompt_bot_profile(
+                config,
+                "Choose Black",
+                excluded_profile_id=config.default_profile.id,
+            )
+
+        self.assertNotEqual(selected, config.default_profile)
+        self.assertIn("Choose a different profile", output.getvalue())
 
 
 if __name__ == "__main__":

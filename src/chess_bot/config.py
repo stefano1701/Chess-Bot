@@ -71,6 +71,8 @@ class EngineConfig:
     default_material: MaterialValues
     mate_score: int
     draw_score: int
+    tournament_default_games: int
+    tournament_progress_bar_width: int
     profiles: dict[str, BotProfile]
     settings: dict[str, Any]
 
@@ -112,6 +114,17 @@ def load_engine_config(path: str | Path | None = None) -> EngineConfig:
     default_material = _material_values(material_settings, None, "evaluation.material")
     mate_score = _non_negative_integer(evaluation, "mate_score", "evaluation.mate_score")
     draw_score = _integer(evaluation, "draw_score", "evaluation.draw_score")
+    tournament = settings.get("tournament")
+    if not isinstance(tournament, dict):
+        raise ConfigError("engine.toml must contain a [tournament] section.")
+    tournament_default_games = _positive_integer(
+        tournament, "default_games", "tournament.default_games"
+    )
+    tournament_progress_bar_width = _positive_integer(
+        tournament, "progress_bar_width", "tournament.progress_bar_width"
+    )
+    if tournament.get("alternate_colors") is not True:
+        raise ConfigError("tournament.alternate_colors must be true.")
     profiles = _load_profiles(profiles_directory, default_material)
 
     if default_profile_id not in profiles:
@@ -126,6 +139,8 @@ def load_engine_config(path: str | Path | None = None) -> EngineConfig:
         default_material=default_material,
         mate_score=mate_score,
         draw_score=draw_score,
+        tournament_default_games=tournament_default_games,
+        tournament_progress_bar_width=tournament_progress_bar_width,
         profiles=profiles,
         settings=settings,
     )
@@ -271,6 +286,17 @@ def _non_negative_integer(
     value = _integer(values, key, location, default)
     if value < 0:
         raise ConfigError(f"{location} must be non-negative.")
+    return value
+
+
+def _positive_integer(
+    values: dict[str, Any],
+    key: str,
+    location: str,
+) -> int:
+    value = _integer(values, key, location)
+    if value <= 0:
+        raise ConfigError(f"{location} must be positive.")
     return value
 
 

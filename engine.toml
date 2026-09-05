@@ -157,6 +157,11 @@ remaining_time_fraction = 0.0
 increment_fraction = 0.0
 emergency_time_ms = 0
 
+[tournament]
+default_games = 20
+progress_bar_width = 32
+alternate_colors = true
+
 [online]
 enabled = false
 platform = "none"

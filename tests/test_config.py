@@ -26,6 +26,8 @@ class ProfileConfigTests(unittest.TestCase):
         self.assertIsInstance(
             create_bot(config, "standard-material"), OnePlyMaterialBot
         )
+        self.assertEqual(config.tournament_default_games, 20)
+        self.assertEqual(config.tournament_progress_bar_width, 32)
 
     def test_equal_minor_profile_overrides_standard_values(self) -> None:
         config = load_engine_config()
@@ -129,7 +131,11 @@ class ProfileConfigTests(unittest.TestCase):
             "bishop = 330\n"
             "rook = 500\n"
             "queen = 900\n"
-            "king = 0\n",
+            "king = 0\n\n"
+            "[tournament]\n"
+            "default_games = 20\n"
+            "progress_bar_width = 32\n"
+            "alternate_colors = true\n",
             encoding="utf-8",
         )
         (profiles_directory / "test.toml").write_text(
