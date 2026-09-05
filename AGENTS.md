@@ -15,14 +15,15 @@ to a mature engine or hide the interesting decisions behind an external engine.
 
 ## Current milestone
 
-Version: 0.7.1
+Version: 0.8.0
 
-Two strategies are implemented: `random` and `one_ply`. The one-ply strategy
-examines every legal move, evaluates the resulting material from White's
-perspective, and chooses the best immediate score for the moving side. It detects
-immediate mate and draw outcomes, but it does not examine the opponent's reply.
-There is no positional evaluation, deeper tree search, tactical/quiescence search,
-opening book, tablebase, clock management, or online adapter yet.
+Three strategies are implemented: `random`, `one_ply`, and `minimax`. The one-ply
+strategy chooses the best immediate material result. Minimax searches to the
+profile's fixed depth, maximizing on White's turns and minimizing on Black's, so
+depth 2 examines the opponent's best immediate reply. Terminal mate and draw
+scores are respected at any searched depth. There is no alpha-beta pruning, move
+ordering, positional evaluation, tactical/quiescence search, opening book,
+tablebase, clock management, or online adapter yet.
 
 The terminal application currently supports:
 
@@ -33,7 +34,8 @@ The terminal application currently supports:
   A progress-only panel and final report split results overall, as White, and
   as Black. Completed reports are timestamped and appended to a configurable
   local text file.
-- Interactive creation of one-ply material profiles.
+- Interactive creation of material profiles with a configurable search depth.
+- Per-move node counts for minimax in human and spectator games.
 - SAN input such as `e4`, `Nf3`, `Qh5`, and `O-O`.
 - UCI coordinate input such as `e2e4`, `g1f3`, and `e7e8q`.
 - A Unicode board with white and shaded squares, rotated for a Black player.
@@ -46,11 +48,12 @@ The terminal application currently supports:
 - `engine.toml`: the single source of truth for engine behavior and future
   shared tuning values. Read it before doing engine work.
 - `profiles/*.toml`: bot names, strategies, seeds, and optional material-value
-  overrides. Standard Material and Equal Minor Pieces are included examples.
+  overrides and search depth. One-ply and two-ply examples are included.
 - `src/chess_bot/config.py`: loads, validates, and creates profiles.
 - `src/chess_bot/engine.py`: constructs the selected engine implementation.
   Add future strategies here rather than branching in the terminal UI.
-- `src/chess_bot/bot.py`: contains `RandomBot` and `OnePlyMaterialBot`.
+- `src/chess_bot/bot.py`: contains `RandomBot`, `OnePlyMaterialBot`, and the
+  recursive fixed-depth `MinimaxBot`.
 - `src/chess_bot/evaluation.py`: terminal-outcome and material evaluation.
 - `src/chess_bot/game.py`: move parsing, move history, and result formatting.
 - `src/chess_bot/display.py`: Unicode and terminal-colour board rendering.
@@ -65,13 +68,15 @@ The terminal application currently supports:
 ## Configuration contract
 
 `engine.toml` deliberately contains settings for planned work as well as the
-current one-ply search. Settings under disabled sections are documentation and
+current fixed-depth search. Settings under disabled sections are documentation and
 tuning placeholders; they must not affect play until the corresponding feature
 is implemented and its section is enabled. Bot-specific settings belong in
 `profiles/*.toml`.
 
 The menu selects a profile, and each profile selects `profile.strategy`. At
-present, validation accepts `random` and `one_ply`. When adding a strategy:
+present, validation accepts `random`, `one_ply`, and `minimax`. A minimax profile
+uses `[search].depth`, falling back to global `search.max_depth`; non-minimax
+profiles always report depth 1. When adding a strategy:
 
 1. Implement it behind the same `choose_move(board)` boundary used by
    `RandomBot`.
@@ -115,9 +120,9 @@ no board is rendered, but progress is redrawn after every game.
 ## Intended learning sequence
 
 1. Random legal moves (complete).
-2. Material evaluation with one-ply move selection and profiles (current).
-3. Negamax/minimax search to a fixed depth.
-4. Alpha-beta pruning and basic move ordering.
+2. Material evaluation with one-ply move selection and profiles (complete).
+3. Minimax search to a fixed configurable depth (current).
+4. Alpha-beta pruning and basic move ordering (next).
 5. Quiescence search for tactical stability.
 6. Positional features: piece-square tables, mobility, pawn structure, king
    safety, space, development, and endgame adjustments.

@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from chess_bot.bot import OnePlyMaterialBot, RandomBot
+from chess_bot.bot import MinimaxBot, OnePlyMaterialBot, RandomBot
 from chess_bot.config import (
     ConfigError,
     MaterialValues,
@@ -15,17 +15,21 @@ from chess_bot.engine import create_bot
 
 
 class ProfileConfigTests(unittest.TestCase):
-    def test_default_config_provides_the_three_initial_profiles(self) -> None:
+    def test_default_config_provides_the_initial_profiles(self) -> None:
         config = load_engine_config()
 
-        self.assertEqual(config.default_profile_id, "standard-material")
+        self.assertEqual(config.default_profile_id, "two-ply-material")
         self.assertEqual(
-            set(config.profiles), {"random", "standard-material", "equal-minors"}
+            set(config.profiles),
+            {"random", "standard-material", "equal-minors", "two-ply-material"},
         )
         self.assertIsInstance(create_bot(config, "random"), RandomBot)
         self.assertIsInstance(
             create_bot(config, "standard-material"), OnePlyMaterialBot
         )
+        minimax_bot = create_bot(config, "two-ply-material")
+        self.assertIsInstance(minimax_bot, MinimaxBot)
+        self.assertEqual(minimax_bot.depth, 2)
         self.assertEqual(config.tournament_default_games, 20)
         self.assertEqual(config.tournament_progress_bar_width, 32)
         self.assertEqual(config.tournament_results_file.name, "tournament-results.txt")
@@ -48,7 +52,8 @@ class ProfileConfigTests(unittest.TestCase):
         config = load_engine_config()
 
         self.assertTrue(config.settings["search"]["enabled"])
-        self.assertEqual(config.settings["search"]["max_depth"], 1)
+        self.assertEqual(config.settings["search"]["max_depth"], 2)
+        self.assertEqual(config.search_max_depth, 2)
         self.assertTrue(config.settings["evaluation"]["enabled"])
         self.assertTrue(config.settings["evaluation"]["material"]["enabled"])
         self.assertFalse(config.settings["tactics"]["enabled"])
@@ -95,7 +100,28 @@ class ProfileConfigTests(unittest.TestCase):
         self.assertEqual(saved_path.name, "my-equal-minors.toml")
         self.assertEqual(saved_profile.name, "My Equal Minors")
         self.assertEqual(saved_profile.strategy, "one_ply")
+        self.assertEqual(saved_profile.search_depth, 1)
         self.assertEqual(saved_profile.material, values)
+
+    def test_custom_minimax_profile_saves_its_search_depth(self) -> None:
+        config_path = self._write_config(
+            profile_name="Initial Bot",
+            strategy="random",
+        )
+        config = load_engine_config(config_path)
+        values = MaterialValues(100, 320, 330, 500, 900)
+
+        saved_path = save_material_profile(
+            config,
+            "Depth Three",
+            values,
+            search_depth=3,
+        )
+        profile = load_engine_config(config_path).get_profile(saved_path.stem)
+
+        self.assertEqual(profile.strategy, "minimax")
+        self.assertEqual(profile.search_depth, 3)
+        self.assertEqual(create_bot(load_engine_config(config_path), profile.id).depth, 3)
 
     def test_unsupported_profile_strategy_has_a_clear_error(self) -> None:
         config_path = self._write_config(

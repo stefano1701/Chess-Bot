@@ -39,7 +39,7 @@ class ProfileMenuTests(unittest.TestCase):
             config,
             profiles_directory=Path(temporary_directory.name),
         )
-        answers = ["My Values", "", "300", "300", "", ""]
+        answers = ["My Values", "", "300", "300", "", "", ""]
 
         with (
             patch("chess_bot.cli.clear_screen"),
@@ -56,6 +56,8 @@ class ProfileMenuTests(unittest.TestCase):
         self.assertEqual(profile_data["material"]["bishop"], 300)
         self.assertEqual(profile_data["material"]["rook"], 500)
         self.assertEqual(profile_data["material"]["queen"], 900)
+        self.assertEqual(profile_data["profile"]["strategy"], "minimax")
+        self.assertEqual(profile_data["search"]["depth"], 2)
 
     def test_tournament_game_count_rejects_invalid_input(self) -> None:
         with (

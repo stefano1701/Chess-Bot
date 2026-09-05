@@ -7,7 +7,7 @@ from typing import Protocol
 
 import chess
 
-from chess_bot.bot import OnePlyMaterialBot, RandomBot
+from chess_bot.bot import MinimaxBot, OnePlyMaterialBot, RandomBot
 from chess_bot.config import BotProfile, ConfigError, EngineConfig
 from chess_bot.evaluation import MaterialEvaluator
 
@@ -44,6 +44,18 @@ def create_bot(
             draw_score=config.draw_score,
         )
         return OnePlyMaterialBot(evaluator=evaluator, name=bot_name, rng=rng)
+    if profile.strategy == "minimax":
+        evaluator = MaterialEvaluator(
+            profile.material,
+            mate_score=config.mate_score,
+            draw_score=config.draw_score,
+        )
+        return MinimaxBot(
+            evaluator=evaluator,
+            depth=profile.search_depth,
+            name=bot_name,
+            rng=rng,
+        )
 
     raise ConfigError(f"No implementation exists for strategy {profile.strategy!r}.")
 

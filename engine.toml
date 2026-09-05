@@ -10,7 +10,7 @@ config_name = "learning-defaults"
 score_unit = "centipawns"
 
 [engine]
-default_profile = "standard-material"
+default_profile = "two-ply-material"
 profiles_directory = "profiles"
 threads = 1                  # Reserved for future search.
 hash_size_mb = 16            # Reserved for a future transposition table.
@@ -18,8 +18,8 @@ ponder = false
 
 [search]
 enabled = true
-algorithm = "one_ply"        # Material profiles currently search one ply.
-max_depth = 1
+algorithm = "minimax"
+max_depth = 2                 # Default for minimax profiles; measured in plies.
 iterative_deepening = false
 time_limit_ms = 0             # 0 = no search clock.
 node_limit = 0                # 0 = unlimited.

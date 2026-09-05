@@ -1,8 +1,8 @@
 # Chess Bot
 
 A deliberately simple chess bot for learning how chess engines evaluate positions
-and search game trees. It now includes a random baseline and the first real search
-stage: choosing the move with the best immediate material result.
+and search game trees. It includes random and one-ply baselines plus fixed-depth
+minimax, which assumes the opponent will choose their strongest available reply.
 
 ## Current features
 
@@ -10,7 +10,8 @@ stage: choosing the move with the best immediate material result.
 - Watch two independently selected profiles play each other
 - Run headless multi-game tournaments with alternating colours, a live progress
   bar, and overall/White/Black statistics for each profile
-- Create material-value profiles from the terminal menu
+- Create material-value profiles with a chosen search depth from the terminal menu
+- See how many positions minimax examined after each move
 - Filled Unicode checkerboard with white and shaded squares, rotated to the
   human player's point of view
 - Enter moves in standard algebraic notation (`e4`, `Nf3`, `Qh5`) or coordinate
@@ -49,27 +50,33 @@ Set a different size for one launch with, for example,
 ## Engine configuration
 
 [`engine.toml`](engine.toml) controls shared engine behavior and points to the
-[`profiles`](profiles) directory. The default is the one-ply material bot:
+[`profiles`](profiles) directory. The default is the two-ply minimax bot:
 
 ```toml
 [engine]
-default_profile = "standard-material"
+default_profile = "two-ply-material"
 profiles_directory = "profiles"
 ```
 
-Three profiles are included:
+Four profiles are included:
 
 - **Random Bot:** chooses any legal move uniformly.
-- **Standard Material:** `P=100, N=320, B=330, R=500, Q=900`.
-- **Equal Minor Pieces:** `P=100, N=300, B=300, R=500, Q=900`.
+- **Standard Material:** one ply; `P=100, N=320, B=330, R=500, Q=900`.
+- **Equal Minor Pieces:** one ply; `P=100, N=300, B=300, R=500, Q=900`.
+- **Two-Ply Material:** minimax depth 2; standard material values.
 
-The two material bots inspect every legal move, evaluate the resulting material,
-and select the best score. They do not yet examine the opponent's reply. Equal
-best moves are selected randomly.
+The one-ply bots inspect every legal move and select the best immediate material
+score. The minimax bot also inspects every legal opponent reply, assumes the
+opponent chooses the reply worst for it, and selects the move with the best
+surviving score. Equal best moves are selected randomly. Search depth is measured
+in plies: one ply is one player's move, so depth 2 means our move plus their reply.
 
-Choose **Create a material bot profile** in the main menu to enter another set of
-values. Each custom profile is saved as an editable TOML file in `profiles/` and
-automatically appears in the play, spectator, and tournament selection menus.
+Choose **Create a material-search bot profile** in the main menu to enter another
+set of values and a search depth. Depth 1 creates the original one-ply strategy;
+depth 2 or higher creates a minimax profile. Each custom profile is saved as an
+editable TOML file in `profiles/` and automatically appears in the play,
+spectator, and tournament selection menus. Depth 4 and above may become slow
+without the pruning planned for the next milestone.
 
 Choose **Run a bot tournament** to compare two bot players over multiple games.
 Each player may use a different profile, or both may use the same profile to show
@@ -117,8 +124,8 @@ python -m unittest discover -s tests
 
 ## Planned learning path
 
-1. Material-only one-ply evaluation (current).
-2. Add negamax/minimax search so the bot examines opponent replies.
+1. Material-only one-ply evaluation (complete).
+2. Fixed-depth minimax so the bot examines opponent replies (current).
 3. Add alpha-beta pruning and move ordering.
 4. Expand positional evaluation (piece-square tables, pawn structure, mobility,
    king safety, and more).

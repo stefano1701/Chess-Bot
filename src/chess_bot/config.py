@@ -17,7 +17,7 @@ except ModuleNotFoundError:  # pragma: no cover - exercised only on Python 3.10.
 
 CONFIG_ENVIRONMENT_VARIABLE = "CHESS_BOT_CONFIG"
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[2] / "engine.toml"
-SUPPORTED_STRATEGIES = {"random", "one_ply"}
+SUPPORTED_STRATEGIES = {"minimax", "one_ply", "random"}
 MATERIAL_PIECES = ("pawn", "knight", "bishop", "rook", "queen", "king")
 
 
@@ -61,6 +61,7 @@ class BotProfile:
     description: str
     random_seed: int | None
     material: MaterialValues
+    search_depth: int
 
 
 @dataclass(frozen=True)
@@ -71,6 +72,7 @@ class EngineConfig:
     default_material: MaterialValues
     mate_score: int
     draw_score: int
+    search_max_depth: int
     tournament_default_games: int
     tournament_progress_bar_width: int
     tournament_results_file: Path
@@ -115,6 +117,12 @@ def load_engine_config(path: str | Path | None = None) -> EngineConfig:
     default_material = _material_values(material_settings, None, "evaluation.material")
     mate_score = _non_negative_integer(evaluation, "mate_score", "evaluation.mate_score")
     draw_score = _integer(evaluation, "draw_score", "evaluation.draw_score")
+    search = settings.get("search", {})
+    if not isinstance(search, dict):
+        raise ConfigError("engine.search must be a table.")
+    search_max_depth = _positive_integer(
+        search, "max_depth", "search.max_depth", default=2
+    )
     tournament = settings.get("tournament")
     if not isinstance(tournament, dict):
         raise ConfigError("engine.toml must contain a [tournament] section.")
@@ -132,7 +140,11 @@ def load_engine_config(path: str | Path | None = None) -> EngineConfig:
     ).resolve()
     if tournament.get("alternate_colors") is not True:
         raise ConfigError("tournament.alternate_colors must be true.")
-    profiles = _load_profiles(profiles_directory, default_material)
+    profiles = _load_profiles(
+        profiles_directory,
+        default_material,
+        search_max_depth,
+    )
 
     if default_profile_id not in profiles:
         raise ConfigError(
@@ -146,6 +158,7 @@ def load_engine_config(path: str | Path | None = None) -> EngineConfig:
         default_material=default_material,
         mate_score=mate_score,
         draw_score=draw_score,
+        search_max_depth=search_max_depth,
         tournament_default_games=tournament_default_games,
         tournament_progress_bar_width=tournament_progress_bar_width,
         tournament_results_file=tournament_results_file,
@@ -158,21 +171,32 @@ def save_material_profile(
     config: EngineConfig,
     name: str,
     material: MaterialValues,
+    search_depth: int = 1,
 ) -> Path:
-    """Create a uniquely named one-ply material profile and return its path."""
+    """Create a uniquely named material-search profile and return its path."""
     clean_name = name.strip()
     if not clean_name:
         raise ConfigError("Profile name cannot be empty.")
+    if search_depth <= 0:
+        raise ConfigError("Search depth must be positive.")
 
     profile_id = _unique_profile_id(config.profiles_directory, clean_name)
     profile_path = config.profiles_directory / f"{profile_id}.toml"
     values = material.as_dict()
+    strategy = "one_ply" if search_depth == 1 else "minimax"
+    description = (
+        "Custom one-ply material profile."
+        if search_depth == 1
+        else f"Custom depth-{search_depth} minimax material profile."
+    )
     contents = (
         "[profile]\n"
         f"name = {json.dumps(clean_name, ensure_ascii=False)}\n"
-        'strategy = "one_ply"\n'
-        'description = "Custom one-ply material profile."\n'
+        f"strategy = {json.dumps(strategy)}\n"
+        f"description = {json.dumps(description)}\n"
         "random_seed = -1\n\n"
+        "[search]\n"
+        f"depth = {search_depth}\n\n"
         "[material]\n"
         + "".join(f"{piece} = {values[piece]}\n" for piece in MATERIAL_PIECES)
     )
@@ -184,6 +208,7 @@ def save_material_profile(
 def _load_profiles(
     profiles_directory: Path,
     default_material: MaterialValues,
+    default_search_depth: int,
 ) -> dict[str, BotProfile]:
     if not profiles_directory.is_dir():
         raise ConfigError(f"Profiles directory not found: {profiles_directory}")
@@ -227,6 +252,19 @@ def _load_profiles(
         material = _material_values(
             material_overrides or {}, default_material, f"{profile_id}.material"
         )
+        search_overrides = data.get("search", {})
+        if not isinstance(search_overrides, dict):
+            raise ConfigError(f"{profile_id}.search must be a table.")
+        search_depth = (
+            _positive_integer(
+                search_overrides,
+                "depth",
+                f"{profile_id}.search.depth",
+                default=default_search_depth,
+            )
+            if strategy == "minimax"
+            else 1
+        )
         profiles[profile_id] = BotProfile(
             id=profile_id,
             source=profile_path,
@@ -235,6 +273,7 @@ def _load_profiles(
             description=description.strip(),
             random_seed=None if configured_seed == -1 else configured_seed,
             material=material,
+            search_depth=search_depth,
         )
 
     if not profiles:
@@ -301,8 +340,9 @@ def _positive_integer(
     values: dict[str, Any],
     key: str,
     location: str,
+    default: int | None = None,
 ) -> int:
-    value = _integer(values, key, location)
+    value = _integer(values, key, location, default)
     if value <= 0:
         raise ConfigError(f"{location} must be positive.")
     return value

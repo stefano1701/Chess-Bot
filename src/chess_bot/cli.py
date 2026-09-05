@@ -16,7 +16,7 @@ from chess_bot.config import (
     save_material_profile,
 )
 from chess_bot.display import clear_screen, render_board
-from chess_bot.engine import create_bot
+from chess_bot.engine import ChessBot, create_bot
 from chess_bot.game import InvalidMoveError, move_history, parse_move, result_text
 from chess_bot.tournament import (
     ResultBreakdown,
@@ -83,8 +83,13 @@ def profile_summary(profile: BotProfile) -> str:
         return f"{profile.name} — random moves"
 
     values = profile.material
+    search = (
+        "one ply"
+        if profile.strategy == "one_ply"
+        else f"minimax depth {profile.search_depth}"
+    )
     return (
-        f"{profile.name} — one ply; "
+        f"{profile.name} — {search}; "
         f"P={values.pawn} N={values.knight} B={values.bishop} "
         f"R={values.rook} Q={values.queen}"
     )
@@ -226,8 +231,13 @@ def _profile_strategy_text(profile: BotProfile) -> str:
     if profile.strategy == "random":
         return "random legal moves"
     values = profile.material
+    search = (
+        "one ply"
+        if profile.strategy == "one_ply"
+        else f"minimax depth {profile.search_depth}"
+    )
     return (
-        f"one ply · P={values.pawn} N={values.knight} B={values.bishop} "
+        f"{search} · P={values.pawn} N={values.knight} B={values.bishop} "
         f"R={values.rook} Q={values.queen}"
     )
 
@@ -304,7 +314,7 @@ def run_bot_tournament_interactively(config: EngineConfig) -> None:
 def create_material_profile_interactively(config: EngineConfig) -> str | None:
     clear_screen()
     print(TITLE)
-    print("\nCreate a one-ply material bot profile\n")
+    print("\nCreate a material-search bot profile\n")
     name = input("Profile name (blank to cancel) › ").strip()
     if not name:
         return None
@@ -319,7 +329,14 @@ def create_material_profile_interactively(config: EngineConfig) -> str | None:
         queen=_prompt_piece_value("Queen", defaults.queen),
         king=0,
     )
-    profile_path = save_material_profile(config, name, material)
+    print("A ply is one player's move. Depth 2 also examines the opponent's reply.")
+    search_depth = _prompt_search_depth(config.search_max_depth)
+    profile_path = save_material_profile(
+        config,
+        name,
+        material,
+        search_depth=search_depth,
+    )
     return profile_path.stem
 
 
@@ -336,6 +353,32 @@ def _prompt_piece_value(piece_name: str, default: int) -> int:
         if value >= 0:
             return value
         print("Enter a non-negative whole number.")
+
+
+def _prompt_search_depth(default: int) -> int:
+    while True:
+        answer = input(f"Search depth in plies [{default}] › ").strip()
+        if answer == "":
+            return default
+        try:
+            depth = int(answer)
+        except ValueError:
+            print("Enter a positive whole number. Depth 4 and above may be slow.")
+            continue
+        if depth > 0:
+            return depth
+        print("Enter a positive whole number. Depth 4 and above may be slow.")
+
+
+def _bot_move_status(bot: ChessBot, notation: str) -> str:
+    status = f"{bot.name} played {notation}."
+    search_stats = getattr(bot, "last_search_stats", None)
+    if search_stats is not None:
+        status += (
+            f" Searched {search_stats.nodes:,} positions "
+            f"to depth {search_stats.depth}."
+        )
+    return status
 
 
 def print_help() -> None:
@@ -412,7 +455,7 @@ def play_human_vs_bot(
             move = bot.choose_move(board)
             notation = board.san(move)
             board.push(move)
-            status = f"{bot.name} played {notation}."
+            status = _bot_move_status(bot, notation)
 
     draw_game(board, human_color, result_text(board))
     input("Press Enter to return to the menu…")
@@ -445,7 +488,7 @@ def watch_bot_match(
         move = bot.choose_move(board)
         notation = board.san(move)
         board.push(move)
-        status = f"{bot.name} played {notation}."
+        status = _bot_move_status(bot, notation)
 
     draw_game(board, chess.WHITE, result_text(board))
     input("Press Enter to return to the menu…")
@@ -465,7 +508,7 @@ def main() -> None:
         print(f"Default: {profile_summary(config.default_profile)}")
         print("1. Play against a bot")
         print("2. Watch bot vs bot")
-        print("3. Create a material bot profile")
+        print("3. Create a material-search bot profile")
         print("4. Run a bot tournament")
         print("5. Quit")
         choice = input("\nChoose an option › ").strip().lower()
