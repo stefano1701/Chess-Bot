@@ -18,6 +18,7 @@ from chess_bot.config import (
 from chess_bot.display import clear_screen, render_board
 from chess_bot.engine import ChessBot, create_bot
 from chess_bot.game import InvalidMoveError, move_history, parse_move, result_text
+from chess_bot.ratings import EloRatings, RatingError
 from chess_bot.tournament import (
     ResultBreakdown,
     TournamentResult,
@@ -78,26 +79,36 @@ def prompt_spectator_delay() -> float | None:
         print("The delay cannot be negative.")
 
 
-def profile_summary(profile: BotProfile) -> str:
+def profile_summary(
+    profile: BotProfile,
+    ratings: EloRatings | None = None,
+) -> str:
     if profile.strategy == "random":
-        return f"{profile.name} — random moves"
+        summary = f"{profile.name} — random moves"
+    else:
+        values = profile.material
+        search = (
+            "one ply"
+            if profile.strategy == "one_ply"
+            else f"minimax depth {profile.search_depth}"
+        )
+        summary = (
+            f"{profile.name} — {search}; "
+            f"P={values.pawn} N={values.knight} B={values.bishop} "
+            f"R={values.rook} Q={values.queen}"
+        )
 
-    values = profile.material
-    search = (
-        "one ply"
-        if profile.strategy == "one_ply"
-        else f"minimax depth {profile.search_depth}"
-    )
-    return (
-        f"{profile.name} — {search}; "
-        f"P={values.pawn} N={values.knight} B={values.bishop} "
-        f"R={values.rook} Q={values.queen}"
-    )
+    if ratings is not None:
+        rating = ratings.rating_for(profile.id)
+        games = ratings.games_for(profile.id)
+        summary += f" | Elo {rating:.1f} ({games} rated games)"
+    return summary
 
 
 def prompt_bot_profile(
     config: EngineConfig,
     heading: str,
+    ratings: EloRatings | None = None,
 ) -> BotProfile | None:
     default = config.default_profile
     others = sorted(
@@ -114,7 +125,9 @@ def prompt_bot_profile(
         print(f"\n{heading}")
         for index, profile in enumerate(profiles, start=1):
             default_marker = " (default)" if profile.id == default.id else ""
-            print(f"{index}. {profile_summary(profile)}{default_marker}")
+            print(
+                f"{index}. {profile_summary(profile, ratings)}{default_marker}"
+            )
         answer = input("Choose a profile, or Q to cancel › ").strip().lower()
         if answer in {"q", "quit", "cancel"}:
             return None
@@ -171,6 +184,7 @@ def format_tournament_progress(
         f"  ♙ White  Player 1 · {result.first_white.name}",
         f"  ♟ Black  Player 2 · {result.first_black.name}",
         "  ↻ Colours alternate after every game",
+        _elo_status_text(result),
         "",
         "┌─ PROFILE RESULTS",
     ]
@@ -183,6 +197,13 @@ def format_tournament_progress(
                     f"[{stats.profile.id}]"
                 ),
                 f"│   {_profile_strategy_text(stats.profile)}",
+            ]
+        )
+        elo_line = _profile_elo_line(result, player_number)
+        if elo_line is not None:
+            lines.append(elo_line)
+        lines.extend(
+            [
                 _format_result_line("Overall", stats.overall),
                 _format_result_line("♙ White", stats.as_white),
                 _format_result_line("♟ Black", stats.as_black),
@@ -213,6 +234,18 @@ def format_tournament_progress(
                 for name, count in sorted(result.terminations.items())
             )
             lines.append(f"│ Endings  {endings}")
+        if result.elo is not None:
+            if result.elo.self_play:
+                lines.append("│ Elo  Unchanged · same-profile self-play is unrated")
+            else:
+                first_delta = result.elo.first_current - result.elo.first_before
+                second_delta = result.elo.second_current - result.elo.second_before
+                lines.append(
+                    f"│ Elo  Player 1 {result.elo.first_before:.1f} → "
+                    f"{result.elo.first_current:.1f} ({first_delta:+.1f}) | "
+                    f"Player 2 {result.elo.second_before:.1f} → "
+                    f"{result.elo.second_current:.1f} ({second_delta:+.1f})"
+                )
         lines.append("└" + "─" * 70)
 
     return "\n".join(lines)
@@ -242,6 +275,30 @@ def _profile_strategy_text(profile: BotProfile) -> str:
     )
 
 
+def _elo_status_text(result: TournamentResult) -> str:
+    if result.elo is None:
+        return ""
+    if result.elo.self_play:
+        return "  Elo: unrated self-play (both players use the same profile)"
+    return f"  Elo: rated tournament · K={result.elo.k_factor}"
+
+
+def _profile_elo_line(
+    result: TournamentResult,
+    player_number: int,
+) -> str | None:
+    if result.elo is None:
+        return None
+    if player_number == 1:
+        before = result.elo.first_before
+        current = result.elo.first_current
+    else:
+        before = result.elo.second_before
+        current = result.elo.second_current
+    delta = current - before
+    return f"│   Elo {current:.1f}  ({delta:+.1f} this tournament)"
+
+
 def _percentage(amount: int, total: int) -> float:
     return 100.0 * amount / total if total else 0.0
 
@@ -264,7 +321,10 @@ def display_tournament_progress(
     )
 
 
-def run_bot_tournament_interactively(config: EngineConfig) -> None:
+def run_bot_tournament_interactively(
+    config: EngineConfig,
+    ratings: EloRatings,
+) -> None:
     clear_screen()
     print(TITLE)
     print("\nBot tournament setup")
@@ -272,12 +332,17 @@ def run_bot_tournament_interactively(config: EngineConfig) -> None:
     if games is None:
         return
 
-    first_white = prompt_bot_profile(config, "Choose White for game 1")
+    first_white = prompt_bot_profile(
+        config,
+        "Choose White for game 1",
+        ratings,
+    )
     if first_white is None:
         return
     first_black = prompt_bot_profile(
         config,
         "Choose Black for game 1",
+        ratings,
     )
     if first_black is None:
         return
@@ -287,6 +352,7 @@ def run_bot_tournament_interactively(config: EngineConfig) -> None:
         first_white.id,
         first_black.id,
         games,
+        ratings=ratings,
         progress_callback=lambda progress: display_tournament_progress(
             progress,
             config.tournament_progress_bar_width,
@@ -297,17 +363,26 @@ def run_bot_tournament_interactively(config: EngineConfig) -> None:
         config.tournament_progress_bar_width,
         final=True,
     )
-    save_message = f"Results appended to {config.tournament_results_file}"
+    save_messages = [f"Results appended to {config.tournament_results_file}"]
     try:
         append_tournament_report(config.tournament_results_file, final_report)
     except OSError as error:
-        save_message = f"Could not save results: {error}"
+        save_messages[0] = f"Could not save results: {error}"
+    if result.elo is not None and not result.elo.self_play:
+        try:
+            ratings.save()
+            save_messages.append(f"Elo ratings saved to {ratings.path}")
+        except OSError as error:
+            save_messages.append(f"Could not save Elo ratings: {error}")
+    else:
+        save_messages.append("Elo unchanged because same-profile self-play is unrated")
     display_tournament_progress(
         result,
         config.tournament_progress_bar_width,
         final=True,
     )
-    print(f"\n✎ {save_message}")
+    for message in save_messages:
+        print(f"\n✎ {message}")
     input("\nPress Enter to return to the menu…")
 
 
@@ -497,7 +572,12 @@ def watch_bot_match(
 def main() -> None:
     try:
         config = load_engine_config()
-    except ConfigError as error:
+        ratings = EloRatings.load(
+            config.elo_ratings_file,
+            initial_rating=config.elo_initial_rating,
+            k_factor=config.elo_k_factor,
+        )
+    except (ConfigError, RatingError) as error:
         print(f"Configuration error: {error}")
         return
 
@@ -505,7 +585,7 @@ def main() -> None:
         clear_screen()
         print(TITLE)
         print("\nLearn chess programming one idea at a time.\n")
-        print(f"Default: {profile_summary(config.default_profile)}")
+        print(f"Default: {profile_summary(config.default_profile, ratings)}")
         print("1. Play against a bot")
         print("2. Watch bot vs bot")
         print("3. Create a material-search bot profile")
@@ -515,14 +595,26 @@ def main() -> None:
 
         try:
             if choice in {"1", "play", "p"}:
-                profile = prompt_bot_profile(config, "Choose your opponent")
+                profile = prompt_bot_profile(
+                    config,
+                    "Choose your opponent",
+                    ratings,
+                )
                 if profile is not None:
                     play_human_vs_bot(prompt_human_color(), config, profile)
             elif choice in {"2", "watch", "w"}:
-                white_profile = prompt_bot_profile(config, "Choose White's profile")
+                white_profile = prompt_bot_profile(
+                    config,
+                    "Choose White's profile",
+                    ratings,
+                )
                 if white_profile is None:
                     continue
-                black_profile = prompt_bot_profile(config, "Choose Black's profile")
+                black_profile = prompt_bot_profile(
+                    config,
+                    "Choose Black's profile",
+                    ratings,
+                )
                 if black_profile is not None:
                     watch_bot_match(
                         prompt_spectator_delay(),
@@ -534,10 +626,13 @@ def main() -> None:
                 profile_id = create_material_profile_interactively(config)
                 if profile_id is not None:
                     config = load_engine_config(config.source)
-                    print(f"\nCreated: {profile_summary(config.get_profile(profile_id))}")
+                    print(
+                        "\nCreated: "
+                        + profile_summary(config.get_profile(profile_id), ratings)
+                    )
                     input("Press Enter to return to the menu…")
             elif choice in {"4", "tournament", "t"}:
-                run_bot_tournament_interactively(config)
+                run_bot_tournament_interactively(config, ratings)
             elif choice in {"5", "quit", "q", "exit"}:
                 print("Thanks for playing!")
                 return

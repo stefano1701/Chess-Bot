@@ -73,6 +73,9 @@ class EngineConfig:
     mate_score: int
     draw_score: int
     search_max_depth: int
+    elo_initial_rating: int
+    elo_k_factor: int
+    elo_ratings_file: Path
     tournament_default_games: int
     tournament_progress_bar_width: int
     tournament_results_file: Path
@@ -123,6 +126,21 @@ def load_engine_config(path: str | Path | None = None) -> EngineConfig:
     search_max_depth = _positive_integer(
         search, "max_depth", "search.max_depth", default=2
     )
+    elo = settings.get("elo", {})
+    if not isinstance(elo, dict):
+        raise ConfigError("engine.elo must be a table.")
+    elo_initial_rating = _positive_integer(
+        elo, "initial_rating", "elo.initial_rating", default=1500
+    )
+    elo_k_factor = _positive_integer(
+        elo, "k_factor", "elo.k_factor", default=32
+    )
+    elo_ratings_file_name = elo.get("ratings_file", "bot-ratings.json")
+    if not isinstance(elo_ratings_file_name, str) or not elo_ratings_file_name.strip():
+        raise ConfigError("elo.ratings_file must be a non-empty string.")
+    elo_ratings_file = (
+        selected_path.parent / elo_ratings_file_name.strip()
+    ).resolve()
     tournament = settings.get("tournament")
     if not isinstance(tournament, dict):
         raise ConfigError("engine.toml must contain a [tournament] section.")
@@ -159,6 +177,9 @@ def load_engine_config(path: str | Path | None = None) -> EngineConfig:
         mate_score=mate_score,
         draw_score=draw_score,
         search_max_depth=search_max_depth,
+        elo_initial_rating=elo_initial_rating,
+        elo_k_factor=elo_k_factor,
+        elo_ratings_file=elo_ratings_file,
         tournament_default_games=tournament_default_games,
         tournament_progress_bar_width=tournament_progress_bar_width,
         tournament_results_file=tournament_results_file,

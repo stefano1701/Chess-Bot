@@ -157,6 +157,11 @@ remaining_time_fraction = 0.0
 increment_fraction = 0.0
 emergency_time_ms = 0
 
+[elo]
+initial_rating = 1500
+k_factor = 32
+ratings_file = "bot-ratings.json"
+
 [tournament]
 default_games = 20
 progress_bar_width = 32

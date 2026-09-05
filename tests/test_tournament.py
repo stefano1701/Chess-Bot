@@ -8,6 +8,7 @@ import chess
 
 from chess_bot.cli import format_tournament_progress
 from chess_bot.config import load_engine_config
+from chess_bot.ratings import EloRatings
 from chess_bot.tournament import (
     CompletedGame,
     append_tournament_report,
@@ -81,6 +82,7 @@ class TournamentTests(unittest.TestCase):
 
         self.assertIn("Progress  [██████████]  2/2 (100.0%)", output)
         self.assertIn("Player 1 · Standard Material  [standard-material]", output)
+        self.assertIn("one ply · P=100 N=320 B=330 R=500 Q=900", output)
         self.assertIn("♙ White", output)
         self.assertIn("♟ Black", output)
         self.assertIn("White wins  2 (100.0%)", output)
@@ -132,6 +134,58 @@ class TournamentTests(unittest.TestCase):
         )
         self.assertEqual(player_one.as_white.wins, 1)
         self.assertEqual(player_two.as_white.wins, 1)
+
+    def test_different_profiles_update_elo_after_each_game(self) -> None:
+        temporary_directory = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary_directory.cleanup)
+        ratings = EloRatings(
+            Path(temporary_directory.name) / "ratings.json",
+            initial_rating=1500,
+            k_factor=32,
+        )
+        games = iter(
+            [
+                CompletedGame(chess.WHITE, "checkmate", 20),
+                CompletedGame(chess.BLACK, "checkmate", 20),
+            ]
+        )
+
+        result = run_tournament(
+            self.config,
+            "standard-material",
+            "equal-minors",
+            2,
+            game_runner=lambda _white, _black: next(games),
+            ratings=ratings,
+        )
+
+        self.assertIsNotNone(result.elo)
+        self.assertEqual(result.elo.rated_games, 2)
+        self.assertAlmostEqual(result.elo.first_current, 1530.5305, places=3)
+        self.assertAlmostEqual(result.elo.second_current, 1469.4695, places=3)
+        self.assertEqual(ratings.games_for("standard-material"), 2)
+        report = format_tournament_progress(result, 10, final=True)
+        self.assertIn("Elo  Player 1 1500.0 → 1530.5 (+30.5)", report)
+
+    def test_same_profile_tournament_is_marked_unrated(self) -> None:
+        temporary_directory = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary_directory.cleanup)
+        ratings = EloRatings(Path(temporary_directory.name) / "ratings.json")
+
+        result = run_tournament(
+            self.config,
+            "standard-material",
+            "standard-material",
+            1,
+            game_runner=lambda _white, _black: CompletedGame(
+                chess.WHITE, "checkmate", 20
+            ),
+            ratings=ratings,
+        )
+
+        self.assertTrue(result.elo.self_play)
+        self.assertEqual(result.elo.rated_games, 0)
+        self.assertEqual(ratings.games_for("standard-material"), 0)
 
 
 if __name__ == "__main__":

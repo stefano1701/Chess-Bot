@@ -10,6 +10,7 @@ minimax, which assumes the opponent will choose their strongest available reply.
 - Watch two independently selected profiles play each other
 - Run headless multi-game tournaments with alternating colours, a live progress
   bar, and overall/White/Black statistics for each profile
+- Maintain persistent Elo ratings and lifetime results for bot profiles
 - Create material-value profiles with a chosen search depth from the terminal menu
 - See how many positions minimax examined after each move
 - Filled Unicode checkerboard with white and shaded squares, rotated to the
@@ -92,6 +93,22 @@ Every completed report is timestamped and appended to
 `tournament-results.txt` in the project directory. The file is ignored by Git so
 local tournament history does not create repository changes. Change
 `tournament.results_file` if you want the log somewhere else.
+
+## Elo ratings
+
+Every tournament game between two different profiles is rated immediately using
+the standard Elo expected-score formula. Profiles start at 1500 and use a
+K-factor of 32 by default. The profile chooser shows each bot's current Elo and
+number of rated games, while tournament reports show live ratings and the change
+for each player.
+
+Ratings and lifetime W/D/L totals are stored by profile ID in
+`bot-ratings.json`. This local file is ignored by Git and is written atomically
+after a completed tournament. Existing tournament text logs are not applied
+retroactively, so all profiles begin at 1500 when this version is first run.
+Same-profile self-play is explicitly unrated: a rating identity cannot gain or
+lose Elo against itself. Configure the initial rating, K-factor, and file path in
+the `[elo]` section of `engine.toml`.
 
 Each profile also has a `random_seed`: `-1` gives fresh tie-breaking choices,
 while a non-negative integer makes them repeatable. The remaining global sections

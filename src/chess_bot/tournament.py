@@ -12,6 +12,7 @@ import chess
 
 from chess_bot.config import BotProfile, EngineConfig
 from chess_bot.engine import ChessBot, create_bot
+from chess_bot.ratings import EloRatings, EloUpdate
 
 
 @dataclass(frozen=True)
@@ -66,6 +67,24 @@ class ProfileTournamentStats:
 
 
 @dataclass
+class TournamentEloStats:
+    k_factor: int
+    self_play: bool
+    first_before: float
+    first_current: float
+    second_before: float
+    second_current: float
+    rated_games: int = 0
+
+    def record(self, update: EloUpdate | None) -> None:
+        if update is None:
+            return
+        self.first_current = update.first_after
+        self.second_current = update.second_after
+        self.rated_games += 1
+
+
+@dataclass
 class TournamentResult:
     games_requested: int
     first_white: BotProfile
@@ -79,6 +98,7 @@ class TournamentResult:
     profile_stats: tuple[ProfileTournamentStats, ProfileTournamentStats] = field(
         init=False
     )
+    elo: TournamentEloStats | None = None
 
     def __post_init__(self) -> None:
         self.profile_stats = (
@@ -109,6 +129,18 @@ class TournamentResult:
 
         self.profile_stats[0].record(first_player_color, game.winner)
         self.profile_stats[1].record(second_player_color, game.winner)
+
+    def enable_elo(self, ratings: EloRatings) -> None:
+        first_rating = ratings.rating_for(self.first_white.id)
+        second_rating = ratings.rating_for(self.first_black.id)
+        self.elo = TournamentEloStats(
+            k_factor=ratings.k_factor,
+            self_play=self.first_white.id == self.first_black.id,
+            first_before=first_rating,
+            first_current=first_rating,
+            second_before=second_rating,
+            second_current=second_rating,
+        )
 
 
 GameRunner = Callable[[ChessBot, ChessBot], CompletedGame]
@@ -143,6 +175,7 @@ def run_tournament(
     *,
     progress_callback: ProgressCallback | None = None,
     game_runner: GameRunner | None = None,
+    ratings: EloRatings | None = None,
 ) -> TournamentResult:
     """Run hidden games, swapping the two profiles' colours after every game."""
     if games <= 0:
@@ -150,6 +183,8 @@ def run_tournament(
     first_white = config.get_profile(first_white_profile_id)
     first_black = config.get_profile(first_black_profile_id)
     result = TournamentResult(games, first_white, first_black)
+    if ratings is not None:
+        result.enable_elo(ratings)
     play_game = game_runner or _play_game
     if progress_callback is not None:
         progress_callback(result)
@@ -172,6 +207,15 @@ def run_tournament(
         )
         completed_game = play_game(white_bot, black_bot)
         result.record_game(completed_game)
+        if ratings is not None and result.elo is not None:
+            first_player_color = chess.WHITE if game_index % 2 == 0 else chess.BLACK
+            first_score = _score_for_color(completed_game.winner, first_player_color)
+            update = ratings.record_game(
+                first_white.id,
+                first_black.id,
+                first_score,
+            )
+            result.elo.record(update)
         if progress_callback is not None:
             progress_callback(result)
 
@@ -199,3 +243,12 @@ def _percentage(amount: int, total: int) -> float:
     if not total:
         return 0.0
     return 100.0 * amount / total
+
+
+def _score_for_color(
+    winner: chess.Color | None,
+    color: chess.Color,
+) -> float:
+    if winner is None:
+        return 0.5
+    return 1.0 if winner == color else 0.0

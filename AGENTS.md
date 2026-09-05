@@ -15,7 +15,7 @@ to a mature engine or hide the interesting decisions behind an external engine.
 
 ## Current milestone
 
-Version: 0.8.0
+Version: 0.9.0
 
 Three strategies are implemented: `random`, `one_ply`, and `minimax`. The one-ply
 strategy chooses the best immediate material result. Minimax searches to the
@@ -36,6 +36,8 @@ The terminal application currently supports:
   local text file.
 - Interactive creation of material profiles with a configurable search depth.
 - Per-move node counts for minimax in human and spectator games.
+- Persistent profile Elo ratings, updated game-by-game for tournaments between
+  different profiles. Same-profile self-play is explicitly unrated.
 - SAN input such as `e4`, `Nf3`, `Qh5`, and `O-O`.
 - UCI coordinate input such as `e2e4`, `g1f3`, and `e7e8q`.
 - A Unicode board with white and shaded squares, rotated for a Black player.
@@ -58,7 +60,9 @@ The terminal application currently supports:
 - `src/chess_bot/game.py`: move parsing, move history, and result formatting.
 - `src/chess_bot/display.py`: Unicode and terminal-colour board rendering.
 - `src/chess_bot/tournament.py`: headless game loop, alternating scheduling,
-  result aggregation, and profile/colour breakdowns.
+  result aggregation, profile/colour breakdowns, and Elo integration.
+- `src/chess_bot/ratings.py`: standard Elo calculations, lifetime profile
+  records, JSON validation, and atomic persistence.
 - `src/chess_bot/cli.py`: menus, interactive game loops, and tournament report
   formatting; engine decisions do not belong here.
 - `scripts/mike-chess`: personal macOS Terminal launcher.
@@ -97,6 +101,13 @@ colour alternation is currently mandatory. Competitors are tracked separately as
 Player 1 and Player 2, so they may use different profiles or the same profile
 while retaining unambiguous statistics. Games run synchronously and headlessly:
 no board is rendered, but progress is redrawn after every game.
+
+`[elo]` supplies the initial rating (1500 by default), K-factor (32), and local
+ratings JSON path. Ratings are keyed by stable profile ID rather than display
+name. Different-profile tournament games update Elo sequentially in memory and
+the completed tournament saves `bot-ratings.json` atomically. This file is
+gitignored. Historical text reports are not backfilled. Same-profile self-play
+must remain unrated because both competitors share one rating identity.
 
 ## Design rules
 
