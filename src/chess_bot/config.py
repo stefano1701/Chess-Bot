@@ -73,6 +73,7 @@ class EngineConfig:
     draw_score: int
     tournament_default_games: int
     tournament_progress_bar_width: int
+    tournament_results_file: Path
     profiles: dict[str, BotProfile]
     settings: dict[str, Any]
 
@@ -123,6 +124,12 @@ def load_engine_config(path: str | Path | None = None) -> EngineConfig:
     tournament_progress_bar_width = _positive_integer(
         tournament, "progress_bar_width", "tournament.progress_bar_width"
     )
+    tournament_results_file_name = _required_text(
+        tournament, "results_file", "tournament.results_file"
+    )
+    tournament_results_file = (
+        selected_path.parent / tournament_results_file_name
+    ).resolve()
     if tournament.get("alternate_colors") is not True:
         raise ConfigError("tournament.alternate_colors must be true.")
     profiles = _load_profiles(profiles_directory, default_material)
@@ -141,6 +148,7 @@ def load_engine_config(path: str | Path | None = None) -> EngineConfig:
         draw_score=draw_score,
         tournament_default_games=tournament_default_games,
         tournament_progress_bar_width=tournament_progress_bar_width,
+        tournament_results_file=tournament_results_file,
         profiles=profiles,
         settings=settings,
     )

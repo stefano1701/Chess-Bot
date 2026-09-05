@@ -28,6 +28,7 @@ class ProfileConfigTests(unittest.TestCase):
         )
         self.assertEqual(config.tournament_default_games, 20)
         self.assertEqual(config.tournament_progress_bar_width, 32)
+        self.assertEqual(config.tournament_results_file.name, "tournament-results.txt")
 
     def test_equal_minor_profile_overrides_standard_values(self) -> None:
         config = load_engine_config()
@@ -135,7 +136,8 @@ class ProfileConfigTests(unittest.TestCase):
             "[tournament]\n"
             "default_games = 20\n"
             "progress_bar_width = 32\n"
-            "alternate_colors = true\n",
+            "alternate_colors = true\n"
+            'results_file = "tournament-results.txt"\n',
             encoding="utf-8",
         )
         (profiles_directory / "test.toml").write_text(

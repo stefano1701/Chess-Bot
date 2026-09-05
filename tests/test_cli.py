@@ -66,20 +66,15 @@ class ProfileMenuTests(unittest.TestCase):
 
         self.assertEqual(games, 7)
 
-    def test_tournament_profile_must_differ_from_first_selection(self) -> None:
+    def test_tournament_profile_can_match_first_selection(self) -> None:
         config = load_engine_config()
         with (
-            patch("builtins.input", side_effect=["1", "2"]),
-            redirect_stdout(StringIO()) as output,
+            patch("builtins.input", return_value="1"),
+            redirect_stdout(StringIO()),
         ):
-            selected = prompt_bot_profile(
-                config,
-                "Choose Black",
-                excluded_profile_id=config.default_profile.id,
-            )
+            selected = prompt_bot_profile(config, "Choose Black")
 
-        self.assertNotEqual(selected, config.default_profile)
-        self.assertIn("Choose a different profile", output.getvalue())
+        self.assertEqual(selected, config.default_profile)
 
 
 if __name__ == "__main__":

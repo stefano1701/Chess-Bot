@@ -18,7 +18,12 @@ from chess_bot.config import (
 from chess_bot.display import clear_screen, render_board
 from chess_bot.engine import create_bot
 from chess_bot.game import InvalidMoveError, move_history, parse_move, result_text
-from chess_bot.tournament import ResultBreakdown, TournamentResult, run_tournament
+from chess_bot.tournament import (
+    ResultBreakdown,
+    TournamentResult,
+    append_tournament_report,
+    run_tournament,
+)
 
 
 TITLE = "♔  CHESS BOT  ♚"
@@ -88,7 +93,6 @@ def profile_summary(profile: BotProfile) -> str:
 def prompt_bot_profile(
     config: EngineConfig,
     heading: str,
-    excluded_profile_id: str | None = None,
 ) -> BotProfile | None:
     default = config.default_profile
     others = sorted(
@@ -105,13 +109,7 @@ def prompt_bot_profile(
         print(f"\n{heading}")
         for index, profile in enumerate(profiles, start=1):
             default_marker = " (default)" if profile.id == default.id else ""
-            unavailable_marker = (
-                " (already selected)" if profile.id == excluded_profile_id else ""
-            )
-            print(
-                f"{index}. {profile_summary(profile)}"
-                f"{default_marker}{unavailable_marker}"
-            )
+            print(f"{index}. {profile_summary(profile)}{default_marker}")
         answer = input("Choose a profile, or Q to cancel › ").strip().lower()
         if answer in {"q", "quit", "cancel"}:
             return None
@@ -123,11 +121,7 @@ def prompt_bot_profile(
             print("Choose one of the listed profile numbers.")
             continue
         if 0 <= selected_index < len(profiles):
-            selected = profiles[selected_index]
-            if selected.id == excluded_profile_id:
-                print("Choose a different profile for the other player.")
-                continue
-            return selected
+            return profiles[selected_index]
         print("Choose one of the listed profile numbers.")
 
 
@@ -162,45 +156,50 @@ def format_tournament_progress(
     bar = "█" * filled + "░" * (progress_bar_width - filled)
     heading = "TOURNAMENT COMPLETE" if final else "BOT TOURNAMENT"
     lines = [
-        heading,
-        "",
+        f"━━━ {heading} ━━━",
         (
-            f"Game {completed} of {requested}  [{bar}] "
-            f"{proportion * 100:5.1f}%"
+            f"Progress  [{bar}]  {completed}/{requested} "
+            f"({proportion * 100:5.1f}%)"
         ),
-        (
-            f"Game 1: {result.first_white.name} as White | "
-            f"{result.first_black.name} as Black"
-        ),
-        "Colours alternate after every game.",
         "",
-        "Profile results",
+        "Game-one colours",
+        f"  ♙ White  Player 1 · {result.first_white.name}",
+        f"  ♟ Black  Player 2 · {result.first_black.name}",
+        "  ↻ Colours alternate after every game",
+        "",
+        "┌─ PROFILE RESULTS",
     ]
 
-    for profile_id in (result.first_white.id, result.first_black.id):
-        stats = result.profile_stats[profile_id]
+    for player_number, stats in enumerate(result.profile_stats, start=1):
         lines.extend(
             [
-                _format_result_line(stats.profile.name, stats.overall),
-                _format_result_line("  as White", stats.as_white),
-                _format_result_line("  as Black", stats.as_black),
+                (
+                    f"│ Player {player_number} · {stats.profile.name}  "
+                    f"[{stats.profile.id}]"
+                ),
+                f"│   {_profile_strategy_text(stats.profile)}",
+                _format_result_line("Overall", stats.overall),
+                _format_result_line("♙ White", stats.as_white),
+                _format_result_line("♟ Black", stats.as_black),
+                "│",
             ]
         )
+    lines[-1] = "└" + "─" * 70
 
     if final:
         lines.extend(
             [
                 "",
-                "Tournament totals",
+                "┌─ TOURNAMENT TOTALS",
                 (
-                    f"White wins: {result.white_wins} "
+                    f"│ White wins  {result.white_wins} "
                     f"({_percentage(result.white_wins, completed):.1f}%) | "
-                    f"Black wins: {result.black_wins} "
+                    f"Black wins  {result.black_wins} "
                     f"({_percentage(result.black_wins, completed):.1f}%) | "
-                    f"Draws: {result.draws} "
+                    f"Draws  {result.draws} "
                     f"({_percentage(result.draws, completed):.1f}%)"
                 ),
-                f"Average game length: {result.average_plies:.1f} half-moves",
+                f"│ Average length  {result.average_plies:.1f} half-moves",
             ]
         )
         if result.terminations:
@@ -208,18 +207,28 @@ def format_tournament_progress(
                 f"{name}: {count}"
                 for name, count in sorted(result.terminations.items())
             )
-            lines.append(f"Endings: {endings}")
+            lines.append(f"│ Endings  {endings}")
+        lines.append("└" + "─" * 70)
 
     return "\n".join(lines)
 
 
 def _format_result_line(label: str, results: ResultBreakdown) -> str:
-    games_label = "game" if results.games == 1 else "games"
     return (
-        f"{label}: {results.games} {games_label} | "
-        f"W {results.wins}  D {results.draws}  L {results.losses} | "
-        f"win {results.win_percentage:5.1f}% | "
-        f"score {results.score_percentage:5.1f}%"
+        f"│   {label:<8} {results.games:>3} GP  │ "
+        f"W {results.wins:>3}  D {results.draws:>3}  L {results.losses:>3}  │ "
+        f"Win {results.win_percentage:5.1f}%  "
+        f"Score {results.score_percentage:5.1f}%"
+    )
+
+
+def _profile_strategy_text(profile: BotProfile) -> str:
+    if profile.strategy == "random":
+        return "random legal moves"
+    values = profile.material
+    return (
+        f"one ply · P={values.pawn} N={values.knight} B={values.bishop} "
+        f"R={values.rook} Q={values.queen}"
     )
 
 
@@ -259,7 +268,6 @@ def run_bot_tournament_interactively(config: EngineConfig) -> None:
     first_black = prompt_bot_profile(
         config,
         "Choose Black for game 1",
-        excluded_profile_id=first_white.id,
     )
     if first_black is None:
         return
@@ -274,11 +282,22 @@ def run_bot_tournament_interactively(config: EngineConfig) -> None:
             config.tournament_progress_bar_width,
         ),
     )
+    final_report = format_tournament_progress(
+        result,
+        config.tournament_progress_bar_width,
+        final=True,
+    )
+    save_message = f"Results appended to {config.tournament_results_file}"
+    try:
+        append_tournament_report(config.tournament_results_file, final_report)
+    except OSError as error:
+        save_message = f"Could not save results: {error}"
     display_tournament_progress(
         result,
         config.tournament_progress_bar_width,
         final=True,
     )
+    print(f"\n✎ {save_message}")
     input("\nPress Enter to return to the menu…")
 
 

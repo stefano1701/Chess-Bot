@@ -71,20 +71,26 @@ Choose **Create a material bot profile** in the main menu to enter another set o
 values. Each custom profile is saved as an editable TOML file in `profiles/` and
 automatically appears in the play, spectator, and tournament selection menus.
 
-Choose **Run a bot tournament** to compare two different profiles over multiple
-games. Select the game count and each profile's colour for game 1; the profiles
-then swap colours after every game. Tournament boards are not drawn. The terminal
-instead shows a live progress bar and each profile's wins, draws, losses, win
-percentage, and chess score percentage, both overall and split by colour. The
-final report also shows White/Black results, average game length, and how games
-ended. With an odd game count, the first profile selected receives one extra game
-as White.
+Choose **Run a bot tournament** to compare two bot players over multiple games.
+Each player may use a different profile, or both may use the same profile to show
+how that style plays against itself. Select the game count and each player's
+profile for game 1; the players then swap colours after every game. Tournament
+boards are not drawn. The terminal instead shows a live progress bar and a panel
+for each player containing wins, draws, losses, win percentage, and chess score
+percentage, both overall and split by colour. The final report also shows
+White/Black results, average game length, and how games ended. With an odd game
+count, Player 1 receives one extra game as White.
+
+Every completed report is timestamped and appended to
+`tournament-results.txt` in the project directory. The file is ignored by Git so
+local tournament history does not create repository changes. Change
+`tournament.results_file` if you want the log somewhere else.
 
 Each profile also has a `random_seed`: `-1` gives fresh tie-breaking choices,
 while a non-negative integer makes them repeatable. The remaining global sections
 scaffold positional evaluation, deeper search, tactics, time management, online
-play, and diagnostics. The `[tournament]` section controls the default game count
-and progress-bar width; colour alternation is required.
+play, and diagnostics. The `[tournament]` section controls the default game count,
+progress-bar width, and results-file location; colour alternation is required.
 
 Set the `CHESS_BOT_CONFIG` environment variable to experiment with a separate
 configuration without editing the default file.

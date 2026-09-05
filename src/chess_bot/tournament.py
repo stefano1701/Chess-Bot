@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import datetime
+from pathlib import Path
 
 import chess
 
@@ -74,13 +76,15 @@ class TournamentResult:
     draws: int = 0
     total_plies: int = 0
     terminations: Counter[str] = field(default_factory=Counter)
-    profile_stats: dict[str, ProfileTournamentStats] = field(init=False)
+    profile_stats: tuple[ProfileTournamentStats, ProfileTournamentStats] = field(
+        init=False
+    )
 
     def __post_init__(self) -> None:
-        self.profile_stats = {
-            self.first_white.id: ProfileTournamentStats(self.first_white),
-            self.first_black.id: ProfileTournamentStats(self.first_black),
-        }
+        self.profile_stats = (
+            ProfileTournamentStats(self.first_white),
+            ProfileTournamentStats(self.first_black),
+        )
 
     @property
     def average_plies(self) -> float:
@@ -88,12 +92,11 @@ class TournamentResult:
             return 0.0
         return self.total_plies / self.games_completed
 
-    def record_game(
-        self,
-        white_profile: BotProfile,
-        black_profile: BotProfile,
-        game: CompletedGame,
-    ) -> None:
+    def record_game(self, game: CompletedGame) -> None:
+        first_player_color = (
+            chess.WHITE if self.games_completed % 2 == 0 else chess.BLACK
+        )
+        second_player_color = not first_player_color
         self.games_completed += 1
         self.total_plies += game.plies
         self.terminations[game.termination] += 1
@@ -104,12 +107,32 @@ class TournamentResult:
         else:
             self.draws += 1
 
-        self.profile_stats[white_profile.id].record(chess.WHITE, game.winner)
-        self.profile_stats[black_profile.id].record(chess.BLACK, game.winner)
+        self.profile_stats[0].record(first_player_color, game.winner)
+        self.profile_stats[1].record(second_player_color, game.winner)
 
 
 GameRunner = Callable[[ChessBot, ChessBot], CompletedGame]
 ProgressCallback = Callable[[TournamentResult], None]
+
+
+def append_tournament_report(
+    path: Path,
+    report: str,
+    *,
+    completed_at: datetime | None = None,
+) -> None:
+    """Append one timestamped tournament report to a readable text log."""
+    timestamp = completed_at or datetime.now().astimezone()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    needs_separator = path.exists() and path.stat().st_size > 0
+    with path.open("a", encoding="utf-8") as results_file:
+        if needs_separator:
+            results_file.write("\n")
+        results_file.write("=" * 72 + "\n")
+        results_file.write(
+            f"Completed: {timestamp.isoformat(timespec='seconds')}\n\n"
+        )
+        results_file.write(report.rstrip() + "\n")
 
 
 def run_tournament(
@@ -124,9 +147,6 @@ def run_tournament(
     """Run hidden games, swapping the two profiles' colours after every game."""
     if games <= 0:
         raise ValueError("Tournament games must be positive.")
-    if first_white_profile_id == first_black_profile_id:
-        raise ValueError("Tournament profiles must be different.")
-
     first_white = config.get_profile(first_white_profile_id)
     first_black = config.get_profile(first_black_profile_id)
     result = TournamentResult(games, first_white, first_black)
@@ -151,7 +171,7 @@ def run_tournament(
             seed_offset=game_index * 2 + 1,
         )
         completed_game = play_game(white_bot, black_bot)
-        result.record_game(white_profile, black_profile, completed_game)
+        result.record_game(completed_game)
         if progress_callback is not None:
             progress_callback(result)
 

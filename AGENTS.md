@@ -15,7 +15,7 @@ to a mature engine or hide the interesting decisions behind an external engine.
 
 ## Current milestone
 
-Version: 0.7.0
+Version: 0.7.1
 
 Two strategies are implemented: `random` and `one_ply`. The one-ply strategy
 examines every legal move, evaluates the resulting material from White's
@@ -30,8 +30,9 @@ The terminal application currently supports:
 - Bot vs bot spectator mode with separate White and Black profiles.
 - Headless repeated bot tournaments. The setup selects the game count and the
   profiles assigned White and Black in game 1, then alternates their colours.
-  A progress-only screen and final report split results overall, as White, and
-  as Black.
+  A progress-only panel and final report split results overall, as White, and
+  as Black. Completed reports are timestamped and appended to a configurable
+  local text file.
 - Interactive creation of one-ply material profiles.
 - SAN input such as `e4`, `Nf3`, `Qh5`, and `O-O`.
 - UCI coordinate input such as `e2e4`, `g1f3`, and `e7e8q`.
@@ -84,11 +85,13 @@ makes random moves and equal-score tie breaking reproducible. `CHESS_BOT_CONFIG`
 may point to an alternate global TOML file; its profiles directory is resolved
 relative to that file.
 
-`[tournament]` supplies the default number of games and progress-bar width.
-Tournament colour alternation is currently mandatory. The two selected profiles
-must differ so each statistics row has an unambiguous identity. Games run
-synchronously and headlessly: no board is rendered, but progress is redrawn after
-every game.
+`[tournament]` supplies the default number of games, progress-bar width, and
+results log path. Relative log paths resolve beside the selected `engine.toml`.
+The default `tournament-results.txt` is deliberately gitignored. Tournament
+colour alternation is currently mandatory. Competitors are tracked separately as
+Player 1 and Player 2, so they may use different profiles or the same profile
+while retaining unambiguous statistics. Games run synchronously and headlessly:
+no board is rendered, but progress is redrawn after every game.
 
 ## Design rules
 
