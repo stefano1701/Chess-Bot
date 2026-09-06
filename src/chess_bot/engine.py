@@ -25,6 +25,7 @@ def create_bot(
     *,
     name: str | None = None,
     seed_offset: int = 0,
+    rng_seed: int | None = None,
 ) -> ChessBot:
     """Build a bot from a named profile or from the configured default."""
     profile = (
@@ -32,7 +33,11 @@ def create_bot(
         if profile_id is None
         else config.get_profile(profile_id)
     )
-    rng = _profile_rng(profile, seed_offset)
+    rng = (
+        random.Random(rng_seed)
+        if rng_seed is not None
+        else _profile_rng(profile, seed_offset)
+    )
     bot_name = name or profile.name
 
     if profile.strategy == "random":

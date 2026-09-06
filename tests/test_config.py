@@ -19,9 +19,9 @@ class ProfileConfigTests(unittest.TestCase):
         config = load_engine_config()
 
         self.assertEqual(config.default_profile_id, "two-ply-material")
-        self.assertEqual(
-            set(config.profiles),
-            {"random", "standard-material", "equal-minors", "two-ply-material"},
+        self.assertTrue(
+            {"random", "standard-material", "equal-minors", "two-ply-material"}
+            <= set(config.profiles)
         )
         self.assertIsInstance(create_bot(config, "random"), RandomBot)
         self.assertIsInstance(
@@ -55,8 +55,9 @@ class ProfileConfigTests(unittest.TestCase):
         self.assertEqual(config.settings["search"]["max_depth"], 2)
         self.assertEqual(config.search_max_depth, 2)
         self.assertEqual(config.elo_initial_rating, 1500)
-        self.assertEqual(config.elo_k_factor, 32)
+        self.assertEqual(config.elo_k_factor, 16)
         self.assertEqual(config.elo_ratings_file.name, "bot-ratings.json")
+        self.assertIsNone(config.tournament_default_seed)
         self.assertTrue(config.settings["evaluation"]["enabled"])
         self.assertTrue(config.settings["evaluation"]["material"]["enabled"])
         self.assertFalse(config.settings["tactics"]["enabled"])

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import random
 import time
 
@@ -160,6 +161,26 @@ def prompt_tournament_game_count(default: int) -> int | None:
         print("Enter a positive whole number.")
 
 
+def prompt_tournament_seed(default: int | None) -> tuple[bool, int | None]:
+    default_text = "random" if default is None else str(default)
+    while True:
+        answer = input(
+            f"Tournament seed [{default_text}], or Q to cancel › "
+        ).strip().lower()
+        if answer in {"q", "quit", "cancel"}:
+            return False, None
+        if answer == "":
+            return True, default
+        try:
+            seed = int(answer)
+        except ValueError:
+            print("Enter a non-negative whole number, or leave blank for random.")
+            continue
+        if seed >= 0:
+            return True, seed
+        print("Enter a non-negative whole number, or leave blank for random.")
+
+
 def format_tournament_progress(
     result: TournamentResult,
     progress_bar_width: int,
@@ -173,11 +194,21 @@ def format_tournament_progress(
     filled = min(progress_bar_width, int(proportion * progress_bar_width))
     bar = "█" * filled + "░" * (progress_bar_width - filled)
     heading = "TOURNAMENT COMPLETE" if final else "BOT TOURNAMENT"
+    timing_label = "Duration" if final else "Elapsed"
+    speed = (
+        f" · {result.games_per_second:.2f} games/s"
+        if result.games_completed
+        else ""
+    )
     lines = [
         f"━━━ {heading} ━━━",
         (
             f"Progress  [{bar}]  {completed}/{requested} "
             f"({proportion * 100:5.1f}%)"
+        ),
+        (
+            f"{timing_label}  {_format_elapsed_time(result.elapsed_seconds)}"
+            f"{speed} · Seed {result.seed}"
         ),
         "",
         "Game-one colours",
@@ -226,6 +257,8 @@ def format_tournament_progress(
                     f"({_percentage(result.draws, completed):.1f}%)"
                 ),
                 f"│ Average length  {result.average_plies:.1f} half-moves",
+                f"│ Duration  {_format_elapsed_time(result.elapsed_seconds)}",
+                f"│ Tournament seed  {result.seed}",
             ]
         )
         if result.terminations:
@@ -246,6 +279,8 @@ def format_tournament_progress(
                     f"Player 2 {result.elo.second_before:.1f} → "
                     f"{result.elo.second_current:.1f} ({second_delta:+.1f})"
                 )
+        performance_lines = _performance_summary_lines(result)
+        lines.extend(performance_lines)
         lines.append("└" + "─" * 70)
 
     return "\n".join(lines)
@@ -299,6 +334,35 @@ def _profile_elo_line(
     return f"│   Elo {current:.1f}  ({delta:+.1f} this tournament)"
 
 
+def _performance_summary_lines(result: TournamentResult) -> list[str]:
+    stats = result.profile_stats[0].overall
+    if not stats.games:
+        return []
+    low, high = stats.score_confidence_interval
+    difference = result.performance_elo_difference
+    if difference is None:
+        return []
+    if math.isinf(difference):
+        elo_text = "+∞" if difference > 0 else "-∞"
+    else:
+        elo_text = f"{difference:+.1f}"
+    return [
+        (
+            f"│ Performance  Player 1 {stats.score_percentage:.1f}% "
+            f"(approx. 95% CI {low * 100:.1f}–{high * 100:.1f}%)"
+        ),
+        f"│ Performance Elo  Player 1 {elo_text} vs Player 2",
+    ]
+
+
+def _format_elapsed_time(seconds: float) -> str:
+    total_tenths = max(0, round(seconds * 10))
+    hours, remainder = divmod(total_tenths, 36_000)
+    minutes, remainder = divmod(remainder, 600)
+    whole_seconds, tenths = divmod(remainder, 10)
+    return f"{hours:02d}:{minutes:02d}:{whole_seconds:02d}.{tenths}"
+
+
 def _percentage(amount: int, total: int) -> float:
     return 100.0 * amount / total if total else 0.0
 
@@ -331,6 +395,9 @@ def run_bot_tournament_interactively(
     games = prompt_tournament_game_count(config.tournament_default_games)
     if games is None:
         return
+    continue_setup, seed = prompt_tournament_seed(config.tournament_default_seed)
+    if not continue_setup:
+        return
 
     first_white = prompt_bot_profile(
         config,
@@ -353,6 +420,7 @@ def run_bot_tournament_interactively(
         first_black.id,
         games,
         ratings=ratings,
+        seed=seed,
         progress_callback=lambda progress: display_tournament_progress(
             progress,
             config.tournament_progress_bar_width,

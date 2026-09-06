@@ -6,7 +6,11 @@ from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
+import math
 from pathlib import Path
+import random
+import secrets
+from time import perf_counter
 
 import chess
 
@@ -48,9 +52,30 @@ class ResultBreakdown:
 
     @property
     def score_percentage(self) -> float:
+        return 100.0 * self.score_fraction
+
+    @property
+    def score_fraction(self) -> float:
         if not self.games:
             return 0.0
-        return 100.0 * (self.wins + self.draws / 2) / self.games
+        return (self.wins + self.draws / 2) / self.games
+
+    @property
+    def score_standard_error(self) -> float:
+        if not self.games:
+            return 0.0
+        mean = self.score_fraction
+        mean_square = (self.wins + self.draws / 4) / self.games
+        variance = max(0.0, mean_square - mean * mean)
+        return math.sqrt(variance / self.games)
+
+    @property
+    def score_confidence_interval(self) -> tuple[float, float]:
+        margin = 1.96 * self.score_standard_error
+        return (
+            max(0.0, self.score_fraction - margin),
+            min(1.0, self.score_fraction + margin),
+        )
 
 
 @dataclass
@@ -89,11 +114,13 @@ class TournamentResult:
     games_requested: int
     first_white: BotProfile
     first_black: BotProfile
+    seed: int
     games_completed: int = 0
     white_wins: int = 0
     black_wins: int = 0
     draws: int = 0
     total_plies: int = 0
+    elapsed_seconds: float = 0.0
     terminations: Counter[str] = field(default_factory=Counter)
     profile_stats: tuple[ProfileTournamentStats, ProfileTournamentStats] = field(
         init=False
@@ -111,6 +138,23 @@ class TournamentResult:
         if not self.games_completed:
             return 0.0
         return self.total_plies / self.games_completed
+
+    @property
+    def games_per_second(self) -> float:
+        if self.elapsed_seconds <= 0:
+            return 0.0
+        return self.games_completed / self.elapsed_seconds
+
+    @property
+    def performance_elo_difference(self) -> float | None:
+        score = self.profile_stats[0].overall.score_fraction
+        if not self.games_completed:
+            return None
+        if score == 0.0:
+            return -math.inf
+        if score == 1.0:
+            return math.inf
+        return 400.0 * math.log10(score / (1.0 - score))
 
     def record_game(self, game: CompletedGame) -> None:
         first_player_color = (
@@ -145,6 +189,7 @@ class TournamentResult:
 
 GameRunner = Callable[[ChessBot, ChessBot], CompletedGame]
 ProgressCallback = Callable[[TournamentResult], None]
+Clock = Callable[[], float]
 
 
 def append_tournament_report(
@@ -176,34 +221,48 @@ def run_tournament(
     progress_callback: ProgressCallback | None = None,
     game_runner: GameRunner | None = None,
     ratings: EloRatings | None = None,
+    seed: int | None = None,
+    clock: Clock = perf_counter,
 ) -> TournamentResult:
     """Run hidden games, swapping the two profiles' colours after every game."""
     if games <= 0:
         raise ValueError("Tournament games must be positive.")
+    if seed is not None and (isinstance(seed, bool) or seed < 0):
+        raise ValueError("Tournament seed must be non-negative.")
     first_white = config.get_profile(first_white_profile_id)
     first_black = config.get_profile(first_black_profile_id)
-    result = TournamentResult(games, first_white, first_black)
+    selected_seed = secrets.randbits(63) if seed is None else seed
+    result = TournamentResult(games, first_white, first_black, selected_seed)
     if ratings is not None:
         result.enable_elo(ratings)
     play_game = game_runner or _play_game
+    seed_generator = random.Random(selected_seed)
+    paired_player_seeds = [
+        (seed_generator.getrandbits(63), seed_generator.getrandbits(63))
+        for _ in range((games + 1) // 2)
+    ]
+    started_at = clock()
     if progress_callback is not None:
         progress_callback(result)
 
     for game_index in range(games):
+        first_player_seed, second_player_seed = paired_player_seeds[game_index // 2]
         if game_index % 2 == 0:
             white_profile, black_profile = first_white, first_black
+            white_seed, black_seed = first_player_seed, second_player_seed
         else:
             white_profile, black_profile = first_black, first_white
+            white_seed, black_seed = second_player_seed, first_player_seed
 
         white_bot = create_bot(
             config,
             white_profile.id,
-            seed_offset=game_index * 2,
+            rng_seed=white_seed,
         )
         black_bot = create_bot(
             config,
             black_profile.id,
-            seed_offset=game_index * 2 + 1,
+            rng_seed=black_seed,
         )
         completed_game = play_game(white_bot, black_bot)
         result.record_game(completed_game)
@@ -216,6 +275,7 @@ def run_tournament(
                 first_score,
             )
             result.elo.record(update)
+        result.elapsed_seconds = max(0.0, clock() - started_at)
         if progress_callback is not None:
             progress_callback(result)
 

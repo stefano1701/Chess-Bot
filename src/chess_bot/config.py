@@ -77,6 +77,7 @@ class EngineConfig:
     elo_k_factor: int
     elo_ratings_file: Path
     tournament_default_games: int
+    tournament_default_seed: int | None
     tournament_progress_bar_width: int
     tournament_results_file: Path
     profiles: dict[str, BotProfile]
@@ -133,7 +134,7 @@ def load_engine_config(path: str | Path | None = None) -> EngineConfig:
         elo, "initial_rating", "elo.initial_rating", default=1500
     )
     elo_k_factor = _positive_integer(
-        elo, "k_factor", "elo.k_factor", default=32
+        elo, "k_factor", "elo.k_factor", default=16
     )
     elo_ratings_file_name = elo.get("ratings_file", "bot-ratings.json")
     if not isinstance(elo_ratings_file_name, str) or not elo_ratings_file_name.strip():
@@ -146,6 +147,17 @@ def load_engine_config(path: str | Path | None = None) -> EngineConfig:
         raise ConfigError("engine.toml must contain a [tournament] section.")
     tournament_default_games = _positive_integer(
         tournament, "default_games", "tournament.default_games"
+    )
+    configured_tournament_seed = _integer(
+        tournament,
+        "default_seed",
+        "tournament.default_seed",
+        default=-1,
+    )
+    if configured_tournament_seed < -1:
+        raise ConfigError("tournament.default_seed must be -1 or non-negative.")
+    tournament_default_seed = (
+        None if configured_tournament_seed == -1 else configured_tournament_seed
     )
     tournament_progress_bar_width = _positive_integer(
         tournament, "progress_bar_width", "tournament.progress_bar_width"
@@ -181,6 +193,7 @@ def load_engine_config(path: str | Path | None = None) -> EngineConfig:
         elo_k_factor=elo_k_factor,
         elo_ratings_file=elo_ratings_file,
         tournament_default_games=tournament_default_games,
+        tournament_default_seed=tournament_default_seed,
         tournament_progress_bar_width=tournament_progress_bar_width,
         tournament_results_file=tournament_results_file,
         profiles=profiles,

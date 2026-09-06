@@ -15,6 +15,7 @@ from chess_bot.cli import (
     create_material_profile_interactively,
     prompt_bot_profile,
     prompt_tournament_game_count,
+    prompt_tournament_seed,
 )
 from chess_bot.config import load_engine_config
 
@@ -67,6 +68,23 @@ class ProfileMenuTests(unittest.TestCase):
             games = prompt_tournament_game_count(20)
 
         self.assertEqual(games, 7)
+
+    def test_tournament_seed_rejects_invalid_input(self) -> None:
+        with (
+            patch("builtins.input", side_effect=["not-a-seed", "-1", "42"]),
+            redirect_stdout(StringIO()),
+        ):
+            should_continue, seed = prompt_tournament_seed(None)
+
+        self.assertTrue(should_continue)
+        self.assertEqual(seed, 42)
+
+    def test_blank_tournament_seed_can_request_a_random_seed(self) -> None:
+        with patch("builtins.input", return_value=""):
+            should_continue, seed = prompt_tournament_seed(None)
+
+        self.assertTrue(should_continue)
+        self.assertIsNone(seed)
 
     def test_tournament_profile_can_match_first_selection(self) -> None:
         config = load_engine_config()

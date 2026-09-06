@@ -11,6 +11,8 @@ from chess_bot.config import load_engine_config
 from chess_bot.ratings import EloRatings
 from chess_bot.tournament import (
     CompletedGame,
+    ResultBreakdown,
+    TournamentResult,
     append_tournament_report,
     run_tournament,
 )
@@ -87,6 +89,87 @@ class TournamentTests(unittest.TestCase):
         self.assertIn("♟ Black", output)
         self.assertIn("White wins  2 (100.0%)", output)
         self.assertIn("Endings  checkmate: 2", output)
+        self.assertIn("Tournament seed", output)
+        self.assertIn("Performance Elo", output)
+
+    def test_seed_replays_random_choices_and_pairs_colour_swaps(self) -> None:
+        def observed_moves(seed: int) -> list[tuple[chess.Move, chess.Move]]:
+            moves: list[tuple[chess.Move, chess.Move]] = []
+
+            def record_first_moves(white, black) -> CompletedGame:
+                board = chess.Board()
+                moves.append((white.choose_move(board), black.choose_move(board)))
+                return CompletedGame(None, "stalemate", 1)
+
+            run_tournament(
+                self.config,
+                "random",
+                "random",
+                4,
+                seed=seed,
+                game_runner=record_first_moves,
+            )
+            return moves
+
+        first_run = observed_moves(8675309)
+        replay = observed_moves(8675309)
+
+        self.assertEqual(first_run, replay)
+        self.assertEqual(first_run[1], tuple(reversed(first_run[0])))
+        self.assertEqual(first_run[3], tuple(reversed(first_run[2])))
+
+    def test_elapsed_time_uses_supplied_clock(self) -> None:
+        times = iter([100.0, 102.0, 105.0])
+        result = run_tournament(
+            self.config,
+            "standard-material",
+            "equal-minors",
+            2,
+            seed=12345,
+            clock=lambda: next(times),
+            game_runner=lambda _white, _black: CompletedGame(
+                None, "stalemate", 1
+            ),
+        )
+
+        self.assertEqual(result.elapsed_seconds, 5.0)
+        self.assertAlmostEqual(result.games_per_second, 0.4)
+        output = format_tournament_progress(result, 10, final=True)
+        self.assertIn("Duration  00:00:05.0", output)
+        self.assertIn("Tournament seed  12345", output)
+
+    def test_performance_elo_and_score_confidence_interval(self) -> None:
+        result = TournamentResult(
+            1000,
+            self.config.get_profile("two-ply-material"),
+            self.config.get_profile("equal-minors"),
+            seed=42,
+        )
+        result.games_completed = 1000
+        result.profile_stats[0].overall = ResultBreakdown(
+            games=1000,
+            wins=432,
+            draws=180,
+            losses=388,
+        )
+
+        low, high = result.profile_stats[0].overall.score_confidence_interval
+        self.assertAlmostEqual(result.performance_elo_difference, 15.297, places=3)
+        self.assertAlmostEqual(low, 0.4940, places=4)
+        self.assertAlmostEqual(high, 0.5500, places=4)
+        output = format_tournament_progress(result, 10, final=True)
+        self.assertIn("Player 1 52.2% (approx. 95% CI 49.4–55.0%)", output)
+        self.assertIn("Performance Elo  Player 1 +15.3 vs Player 2", output)
+
+    def test_negative_tournament_seed_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "seed must be non-negative"):
+            run_tournament(
+                self.config,
+                "random",
+                "random",
+                1,
+                seed=-1,
+            )
 
     def test_text_reports_are_appended_instead_of_replaced(self) -> None:
         temporary_directory = tempfile.TemporaryDirectory()

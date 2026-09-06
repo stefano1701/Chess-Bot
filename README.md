@@ -9,7 +9,7 @@ minimax, which assumes the opponent will choose their strongest available reply.
 - Play against a selected bot profile as White or Black
 - Watch two independently selected profiles play each other
 - Run headless multi-game tournaments with alternating colours, a live progress
-  bar, and overall/White/Black statistics for each profile
+  bar, elapsed timer, replayable seed, and overall/White/Black statistics
 - Maintain persistent Elo ratings and lifetime results for bot profiles
 - Create material-value profiles with a chosen search depth from the terminal menu
 - See how many positions minimax examined after each move
@@ -81,12 +81,18 @@ without the pruning planned for the next milestone.
 
 Choose **Run a bot tournament** to compare two bot players over multiple games.
 Each player may use a different profile, or both may use the same profile to show
-how that style plays against itself. Select the game count and each player's
-profile for game 1; the players then swap colours after every game. Tournament
-boards are not drawn. The terminal instead shows a live progress bar and a panel
-for each player containing wins, draws, losses, win percentage, and chess score
-percentage, both overall and split by colour. The final report also shows
-White/Black results, average game length, and how games ended. With an odd game
+how that style plays against itself. Select the game count, an optional seed, and
+each player's profile for game 1; the players then swap colours after every game.
+Leave the seed blank to generate one automatically. The chosen seed is shown and
+saved so the tournament can be replayed later with the same code and profile
+settings. Adjacent games are paired: each player receives the same random
+tie-breaking stream when the colours swap.
+
+Tournament boards are not drawn. The terminal instead shows a live progress bar,
+elapsed time, games per second, and a panel for each player containing wins,
+draws, losses, win percentage, and chess score percentage, both overall and split
+by colour. The final report also shows total duration, White/Black results,
+average game length, how games ended, and the tournament seed. With an odd game
 count, Player 1 receives one extra game as White.
 
 Every completed report is timestamped and appended to
@@ -98,9 +104,18 @@ local tournament history does not create repository changes. Change
 
 Every tournament game between two different profiles is rated immediately using
 the standard Elo expected-score formula. Profiles start at 1500 and use a
-K-factor of 32 by default. The profile chooser shows each bot's current Elo and
+K-factor of 16 by default. The profile chooser shows each bot's current Elo and
 number of rated games, while tournament reports show live ratings and the change
-for each player.
+for each player. This persistent Elo is updated sequentially, so it describes the
+profiles' accumulated history rather than only the latest match.
+
+The final report also gives Player 1's tournament performance as a score with an
+approximate 95% confidence interval, plus its performance Elo difference against
+Player 2. Performance Elo is calculated from this tournament's aggregate score;
+it is a diagnostic comparison, not a second stored rating. A positive value means
+Player 1 performed that many Elo points above Player 2, and a negative value means
+below. The confidence interval is an approximation and paired games are not fully
+independent, so use it as a guide rather than a proof that one profile is better.
 
 Ratings and lifetime W/D/L totals are stored by profile ID in
 `bot-ratings.json`. This local file is ignored by Git and is written atomically
@@ -110,11 +125,14 @@ Same-profile self-play is explicitly unrated: a rating identity cannot gain or
 lose Elo against itself. Configure the initial rating, K-factor, and file path in
 the `[elo]` section of `engine.toml`.
 
-Each profile also has a `random_seed`: `-1` gives fresh tie-breaking choices,
-while a non-negative integer makes them repeatable. The remaining global sections
-scaffold positional evaluation, deeper search, tactics, time management, online
-play, and diagnostics. The `[tournament]` section controls the default game count,
-progress-bar width, and results-file location; colour alternation is required.
+Each profile also has a `random_seed`: outside tournaments, `-1` gives fresh
+tie-breaking choices while a non-negative integer makes them repeatable.
+Tournaments override profile seeds with their displayed tournament seed. The
+remaining global sections scaffold positional evaluation, deeper search, tactics,
+time management, online play, and diagnostics. The `[tournament]` section controls
+the default game count, seed, progress-bar width, and results-file location;
+colour alternation is required. A default seed of `-1` means generate and report
+a fresh replayable seed for every tournament.
 
 Set the `CHESS_BOT_CONFIG` environment variable to experiment with a separate
 configuration without editing the default file.
