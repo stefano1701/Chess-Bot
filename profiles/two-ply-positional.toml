@@ -9,6 +9,15 @@ depth = 2
 
 [evaluation]
 piece_square_tables = 1.0
+piece_square_table_set = "simplified"
+
+[evaluation.piece_square_weights]
+pawn = 1.0
+knight = 1.0
+bishop = 1.0
+rook = 1.0
+queen = 1.0
+king = 1.0
 
 # Material values are inherited from engine.toml:
 # pawn=100, knight=320, bishop=330, rook=500, queen=900.

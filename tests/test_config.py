@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+import shutil
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -8,6 +9,7 @@ from chess_bot.bot import MinimaxBot, OnePlyMaterialBot, RandomBot
 from chess_bot.config import (
     ConfigError,
     MaterialValues,
+    PieceSquareWeights,
     load_engine_config,
     save_material_profile,
 )
@@ -40,6 +42,8 @@ class ProfileConfigTests(unittest.TestCase):
         positional_bot = create_bot(config, positional.id)
         self.assertEqual(positional.search_depth, 2)
         self.assertEqual(positional.piece_square_weight, 1.0)
+        self.assertEqual(positional.piece_square_table_set_id, "simplified")
+        self.assertEqual(positional.piece_square_weights, PieceSquareWeights())
         self.assertEqual(positional_bot.evaluator.piece_square_weight, 1.0)
         self.assertEqual(config.get_profile("two-ply-material").piece_square_weight, 0)
         self.assertEqual(config.tournament_default_games, 20)
@@ -78,9 +82,15 @@ class ProfileConfigTests(unittest.TestCase):
             config.settings["evaluation"]["piece_square_tables"]["enabled"]
         )
         self.assertEqual(
-            config.settings["evaluation"]["piece_square_tables"]["table_set"],
+            config.settings["evaluation"]["piece_square_tables"][
+                "default_table_set"
+            ],
             "simplified",
         )
+        simplified = config.get_piece_square_table_set("simplified")
+        self.assertEqual(simplified.name, "Simplified")
+        self.assertEqual(len(simplified.for_piece_type(2)), 64)
+        self.assertEqual(simplified.for_piece_type(2)[21], 10)
         self.assertFalse(config.settings["tactics"]["enabled"])
 
     def test_configured_seed_makes_random_profile_repeatable(self) -> None:
@@ -163,12 +173,46 @@ class ProfileConfigTests(unittest.TestCase):
             values,
             search_depth=2,
             piece_square_weight=0.5,
+            piece_square_table_set_id="simplified",
+            piece_square_weights=PieceSquareWeights(knight=1.5, king=0.0),
         )
         profile = load_engine_config(config_path).get_profile(saved_path.stem)
 
         self.assertEqual(profile.piece_square_weight, 0.5)
+        self.assertEqual(profile.piece_square_table_set_id, "simplified")
+        self.assertEqual(profile.piece_square_weights.knight, 1.5)
+        self.assertEqual(profile.piece_square_weights.king, 0.0)
         positional_bot = create_bot(load_engine_config(config_path), profile.id)
         self.assertEqual(positional_bot.depth, 2)
+
+    def test_additional_piece_square_table_files_are_discovered(self) -> None:
+        config_path = self._write_config(
+            profile_name="Initial Bot",
+            strategy="random",
+            piece_square_tables_enabled=True,
+        )
+        tables_directory = config_path.parent / "piece-square-tables"
+        source = tables_directory / "simplified.toml"
+        experimental = tables_directory / "experimental.toml"
+        experimental.write_text(
+            source.read_text(encoding="utf-8").replace(
+                'name = "Simplified"',
+                'name = "Experimental"',
+                1,
+            ),
+            encoding="utf-8",
+        )
+
+        config = load_engine_config(config_path)
+
+        self.assertEqual(
+            set(config.piece_square_table_sets),
+            {"simplified", "experimental"},
+        )
+        self.assertEqual(
+            config.get_piece_square_table_set("experimental").name,
+            "Experimental",
+        )
 
     def test_unsupported_profile_strategy_has_a_clear_error(self) -> None:
         config_path = self._write_config(
@@ -192,6 +236,15 @@ class ProfileConfigTests(unittest.TestCase):
         root = Path(temporary_directory.name)
         profiles_directory = root / "profiles"
         profiles_directory.mkdir()
+        if piece_square_tables_enabled:
+            tables_directory = root / "piece-square-tables"
+            tables_directory.mkdir()
+            shutil.copyfile(
+                Path(__file__).parents[1]
+                / "piece-square-tables"
+                / "simplified.toml",
+                tables_directory / "simplified.toml",
+            )
         config_path = root / "engine.toml"
         config_path.write_text(
             "[engine]\n"
@@ -211,6 +264,8 @@ class ProfileConfigTests(unittest.TestCase):
             "king = 0\n\n"
             "[evaluation.piece_square_tables]\n"
             f"enabled = {str(piece_square_tables_enabled).lower()}\n\n"
+            'directory = "piece-square-tables"\n'
+            'default_table_set = "simplified"\n\n'
             "[tournament]\n"
             "default_games = 20\n"
             "progress_bar_width = 32\n"

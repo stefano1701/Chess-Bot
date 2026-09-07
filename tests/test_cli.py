@@ -25,7 +25,10 @@ class ProfileMenuTests(unittest.TestCase):
     def test_positional_profile_summary_shows_its_weight(self) -> None:
         profile = load_engine_config().get_profile("two-ply-positional")
 
-        self.assertIn("positional tables ×1", profile_summary(profile))
+        self.assertIn(
+            "PST simplified ×1 [P=1 N=1 B=1 R=1 Q=1 K=1]",
+            profile_summary(profile),
+        )
 
     def test_blank_profile_selection_uses_the_default(self) -> None:
         config = load_engine_config()
@@ -46,7 +49,23 @@ class ProfileMenuTests(unittest.TestCase):
             config,
             profiles_directory=Path(temporary_directory.name),
         )
-        answers = ["My Values", "", "300", "300", "", "", "", "1.5"]
+        answers = [
+            "My Values",
+            "",
+            "300",
+            "300",
+            "",
+            "",
+            "",
+            "1.5",
+            "",
+            "",
+            "2",
+            "",
+            "",
+            "",
+            "0",
+        ]
 
         with (
             patch("chess_bot.cli.clear_screen"),
@@ -66,6 +85,15 @@ class ProfileMenuTests(unittest.TestCase):
         self.assertEqual(profile_data["profile"]["strategy"], "minimax")
         self.assertEqual(profile_data["search"]["depth"], 2)
         self.assertEqual(profile_data["evaluation"]["piece_square_tables"], 1.5)
+        self.assertEqual(
+            profile_data["evaluation"]["piece_square_table_set"], "simplified"
+        )
+        self.assertEqual(
+            profile_data["evaluation"]["piece_square_weights"]["knight"], 2
+        )
+        self.assertEqual(
+            profile_data["evaluation"]["piece_square_weights"]["king"], 0
+        )
 
     def test_tournament_game_count_rejects_invalid_input(self) -> None:
         with (

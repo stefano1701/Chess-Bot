@@ -54,6 +54,56 @@ class MaterialValues:
 
 
 @dataclass(frozen=True)
+class PieceSquareWeights:
+    pawn: float = 1.0
+    knight: float = 1.0
+    bishop: float = 1.0
+    rook: float = 1.0
+    queen: float = 1.0
+    king: float = 1.0
+
+    def for_piece_type(self, piece_type: int) -> float:
+        piece_names = {
+            1: "pawn",
+            2: "knight",
+            3: "bishop",
+            4: "rook",
+            5: "queen",
+            6: "king",
+        }
+        try:
+            return getattr(self, piece_names[piece_type])
+        except KeyError as error:
+            raise ValueError(f"Unknown chess piece type: {piece_type}") from error
+
+    def as_dict(self) -> dict[str, float]:
+        return {piece: getattr(self, piece) for piece in MATERIAL_PIECES}
+
+
+@dataclass(frozen=True)
+class PieceSquareTableSet:
+    id: str
+    source: Path
+    name: str
+    description: str
+    tables: dict[str, tuple[int, ...]]
+
+    def for_piece_type(self, piece_type: int) -> tuple[int, ...]:
+        piece_names = {
+            1: "pawn",
+            2: "knight",
+            3: "bishop",
+            4: "rook",
+            5: "queen",
+            6: "king",
+        }
+        try:
+            return self.tables[piece_names[piece_type]]
+        except KeyError as error:
+            raise ValueError(f"Unknown chess piece type: {piece_type}") from error
+
+
+@dataclass(frozen=True)
 class BotProfile:
     id: str
     source: Path
@@ -63,6 +113,8 @@ class BotProfile:
     random_seed: int | None
     material: MaterialValues
     piece_square_weight: float
+    piece_square_table_set_id: str
+    piece_square_weights: PieceSquareWeights
     search_depth: int
 
 
@@ -73,7 +125,11 @@ class EngineConfig:
     default_profile_id: str
     default_material: MaterialValues
     piece_square_tables_enabled: bool
+    piece_square_tables_directory: Path
+    default_piece_square_table_set_id: str
     default_piece_square_weight: float
+    default_piece_square_weights: PieceSquareWeights
+    piece_square_table_sets: dict[str, PieceSquareTableSet]
     mate_score: int
     draw_score: int
     search_max_depth: int
@@ -96,6 +152,14 @@ class EngineConfig:
             return self.profiles[profile_id]
         except KeyError as error:
             raise ConfigError(f"Unknown bot profile: {profile_id!r}.") from error
+
+    def get_piece_square_table_set(self, table_set_id: str) -> PieceSquareTableSet:
+        try:
+            return self.piece_square_table_sets[table_set_id]
+        except KeyError as error:
+            raise ConfigError(
+                f"Unknown piece-square table set: {table_set_id!r}."
+            ) from error
 
 
 def load_engine_config(path: str | Path | None = None) -> EngineConfig:
@@ -135,12 +199,30 @@ def load_engine_config(path: str | Path | None = None) -> EngineConfig:
         "evaluation.piece_square_tables.enabled",
         default=False,
     )
-    piece_square_table_set = piece_square_settings.get("table_set", "simplified")
-    if piece_square_tables_enabled and piece_square_table_set != "simplified":
+    piece_square_tables_directory_name = piece_square_settings.get(
+        "directory", "piece-square-tables"
+    )
+    if (
+        not isinstance(piece_square_tables_directory_name, str)
+        or not piece_square_tables_directory_name.strip()
+    ):
         raise ConfigError(
-            "evaluation.piece_square_tables.table_set must currently be "
-            "'simplified'."
+            "evaluation.piece_square_tables.directory must be non-empty text."
         )
+    piece_square_tables_directory = (
+        selected_path.parent / piece_square_tables_directory_name.strip()
+    ).resolve()
+    default_piece_square_table_set_id = piece_square_settings.get(
+        "default_table_set", "simplified"
+    )
+    if (
+        not isinstance(default_piece_square_table_set_id, str)
+        or not default_piece_square_table_set_id.strip()
+    ):
+        raise ConfigError(
+            "evaluation.piece_square_tables.default_table_set must be non-empty text."
+        )
+    default_piece_square_table_set_id = default_piece_square_table_set_id.strip()
     interpolate_piece_square_tables = _boolean(
         piece_square_settings,
         "interpolate_by_phase",
@@ -151,6 +233,14 @@ def load_engine_config(path: str | Path | None = None) -> EngineConfig:
         raise ConfigError(
             "Piece-square game-phase interpolation is not implemented yet."
         )
+    piece_square_weight_settings = evaluation.get("piece_square_weights", {})
+    if not isinstance(piece_square_weight_settings, dict):
+        raise ConfigError("evaluation.piece_square_weights must be a table.")
+    default_piece_square_weights = _piece_square_weights(
+        piece_square_weight_settings,
+        None,
+        "evaluation.piece_square_weights",
+    )
     default_piece_square_weight = _non_negative_number(
         evaluation_weights,
         "piece_square_tables",
@@ -161,6 +251,19 @@ def load_engine_config(path: str | Path | None = None) -> EngineConfig:
         raise ConfigError(
             "evaluation.weights.piece_square_tables must be 0 when "
             "evaluation.piece_square_tables.enabled is false."
+        )
+    piece_square_table_sets = (
+        _load_piece_square_table_sets(piece_square_tables_directory)
+        if piece_square_tables_enabled
+        else {}
+    )
+    if (
+        piece_square_tables_enabled
+        and default_piece_square_table_set_id not in piece_square_table_sets
+    ):
+        raise ConfigError(
+            "evaluation.piece_square_tables.default_table_set does not match "
+            f"a table file: {default_piece_square_table_set_id!r}."
         )
     mate_score = _non_negative_integer(
         evaluation, "mate_score", "evaluation.mate_score"
@@ -219,7 +322,10 @@ def load_engine_config(path: str | Path | None = None) -> EngineConfig:
         profiles_directory,
         default_material,
         piece_square_tables_enabled,
+        piece_square_table_sets,
+        default_piece_square_table_set_id,
         default_piece_square_weight,
+        default_piece_square_weights,
         search_max_depth,
     )
 
@@ -234,7 +340,11 @@ def load_engine_config(path: str | Path | None = None) -> EngineConfig:
         default_profile_id=default_profile_id,
         default_material=default_material,
         piece_square_tables_enabled=piece_square_tables_enabled,
+        piece_square_tables_directory=piece_square_tables_directory,
+        default_piece_square_table_set_id=default_piece_square_table_set_id,
         default_piece_square_weight=default_piece_square_weight,
+        default_piece_square_weights=default_piece_square_weights,
+        piece_square_table_sets=piece_square_table_sets,
         mate_score=mate_score,
         draw_score=draw_score,
         search_max_depth=search_max_depth,
@@ -256,8 +366,10 @@ def save_material_profile(
     material: MaterialValues,
     search_depth: int = 1,
     piece_square_weight: float = 0.0,
+    piece_square_table_set_id: str | None = None,
+    piece_square_weights: PieceSquareWeights | None = None,
 ) -> Path:
-    """Create a uniquely named material-search profile and return its path."""
+    """Create a uniquely named configurable search profile and return its path."""
     clean_name = name.strip()
     if not clean_name:
         raise ConfigError("Profile name cannot be empty.")
@@ -272,6 +384,24 @@ def save_material_profile(
         raise ConfigError("Piece-square weight must be a non-negative number.")
     if piece_square_weight > 0 and not config.piece_square_tables_enabled:
         raise ConfigError("Piece-square tables are disabled in engine.toml.")
+    selected_table_set_id = (
+        config.default_piece_square_table_set_id
+        if piece_square_table_set_id is None
+        else piece_square_table_set_id.strip()
+    )
+    if not selected_table_set_id:
+        raise ConfigError("Piece-square table set cannot be empty.")
+    if (
+        piece_square_weight > 0
+        and selected_table_set_id not in config.piece_square_table_sets
+    ):
+        raise ConfigError(f"Unknown piece-square table set: {selected_table_set_id!r}.")
+    selected_piece_weights = (
+        config.default_piece_square_weights
+        if piece_square_weights is None
+        else piece_square_weights
+    )
+    _validate_piece_square_weights(selected_piece_weights)
 
     profile_id = _unique_profile_id(config.profiles_directory, clean_name)
     profile_path = config.profiles_directory / f"{profile_id}.toml"
@@ -284,6 +414,7 @@ def save_material_profile(
     )
     if piece_square_weight > 0:
         description = description.removesuffix(".") + " with positional tables."
+    positional_values = selected_piece_weights.as_dict()
     contents = (
         "[profile]\n"
         f"name = {json.dumps(clean_name, ensure_ascii=False)}\n"
@@ -293,7 +424,14 @@ def save_material_profile(
         "[search]\n"
         f"depth = {search_depth}\n\n"
         "[evaluation]\n"
-        f"piece_square_tables = {float(piece_square_weight)}\n\n"
+        f"piece_square_tables = {float(piece_square_weight)}\n"
+        f"piece_square_table_set = {json.dumps(selected_table_set_id)}\n\n"
+        "[evaluation.piece_square_weights]\n"
+        + "".join(
+            f"{piece} = {positional_values[piece]}\n"
+            for piece in MATERIAL_PIECES
+        )
+        + "\n"
         "[material]\n"
         + "".join(f"{piece} = {values[piece]}\n" for piece in MATERIAL_PIECES)
     )
@@ -306,7 +444,10 @@ def _load_profiles(
     profiles_directory: Path,
     default_material: MaterialValues,
     piece_square_tables_enabled: bool,
+    piece_square_table_sets: dict[str, PieceSquareTableSet],
+    default_piece_square_table_set_id: str,
     default_piece_square_weight: float,
+    default_piece_square_weights: PieceSquareWeights,
     default_search_depth: int,
 ) -> dict[str, BotProfile]:
     if not profiles_directory.is_dir():
@@ -360,10 +501,42 @@ def _load_profiles(
             f"{profile_id}.evaluation.piece_square_tables",
             default=default_piece_square_weight,
         )
+        piece_square_table_set_id = evaluation_overrides.get(
+            "piece_square_table_set", default_piece_square_table_set_id
+        )
+        if (
+            not isinstance(piece_square_table_set_id, str)
+            or not piece_square_table_set_id.strip()
+        ):
+            raise ConfigError(
+                f"{profile_id}.evaluation.piece_square_table_set must be "
+                "non-empty text."
+            )
+        piece_square_table_set_id = piece_square_table_set_id.strip()
+        piece_weight_overrides = evaluation_overrides.get(
+            "piece_square_weights", {}
+        )
+        if not isinstance(piece_weight_overrides, dict):
+            raise ConfigError(
+                f"{profile_id}.evaluation.piece_square_weights must be a table."
+            )
+        piece_square_weights = _piece_square_weights(
+            piece_weight_overrides,
+            default_piece_square_weights,
+            f"{profile_id}.evaluation.piece_square_weights",
+        )
         if piece_square_weight > 0 and not piece_square_tables_enabled:
             raise ConfigError(
                 f"{profile_id} enables piece-square tables, but "
                 "evaluation.piece_square_tables.enabled is false."
+            )
+        if (
+            piece_square_weight > 0
+            and piece_square_table_set_id not in piece_square_table_sets
+        ):
+            raise ConfigError(
+                f"{profile_id}.evaluation.piece_square_table_set does not match "
+                f"a table file: {piece_square_table_set_id!r}."
             )
         search_overrides = data.get("search", {})
         if not isinstance(search_overrides, dict):
@@ -387,6 +560,8 @@ def _load_profiles(
             random_seed=None if configured_seed == -1 else configured_seed,
             material=material,
             piece_square_weight=piece_square_weight,
+            piece_square_table_set_id=piece_square_table_set_id,
+            piece_square_weights=piece_square_weights,
             search_depth=search_depth,
         )
 
@@ -407,6 +582,96 @@ def _material_values(
             values, piece, f"{location}.{piece}", default=fallback
         )
     return MaterialValues(**resolved)
+
+
+def _piece_square_weights(
+    values: dict[str, Any],
+    defaults: PieceSquareWeights | None,
+    location: str,
+) -> PieceSquareWeights:
+    resolved: dict[str, float] = {}
+    for piece in MATERIAL_PIECES:
+        fallback = getattr(defaults, piece) if defaults is not None else 1.0
+        resolved[piece] = _non_negative_number(
+            values,
+            piece,
+            f"{location}.{piece}",
+            default=fallback,
+        )
+    return PieceSquareWeights(**resolved)
+
+
+def _validate_piece_square_weights(weights: PieceSquareWeights) -> None:
+    for piece, value in weights.as_dict().items():
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(value)
+            or value < 0
+        ):
+            raise ConfigError(
+                f"Piece-square {piece} weight must be a non-negative number."
+            )
+
+
+def _load_piece_square_table_sets(
+    tables_directory: Path,
+) -> dict[str, PieceSquareTableSet]:
+    if not tables_directory.is_dir():
+        raise ConfigError(
+            f"Piece-square tables directory not found: {tables_directory}"
+        )
+
+    table_sets: dict[str, PieceSquareTableSet] = {}
+    for table_path in sorted(tables_directory.glob("*.toml")):
+        table_set_id = table_path.stem
+        data = _load_toml(table_path, "Piece-square table set")
+        metadata = data.get("meta", {})
+        if not isinstance(metadata, dict):
+            raise ConfigError(f"{table_path}.meta must be a table.")
+        name = metadata.get("name", table_set_id)
+        description = metadata.get("description", "")
+        if not isinstance(name, str) or not name.strip():
+            raise ConfigError(f"{table_path}.meta.name must be non-empty text.")
+        if not isinstance(description, str):
+            raise ConfigError(f"{table_path}.meta.description must be text.")
+        raw_tables = data.get("tables")
+        if not isinstance(raw_tables, dict):
+            raise ConfigError(f"{table_path} must contain a [tables] section.")
+        tables = {
+            piece: _piece_square_table(
+                raw_tables.get(piece),
+                f"{table_set_id}.tables.{piece}",
+            )
+            for piece in MATERIAL_PIECES
+        }
+        table_sets[table_set_id] = PieceSquareTableSet(
+            id=table_set_id,
+            source=table_path,
+            name=name.strip(),
+            description=description.strip(),
+            tables=tables,
+        )
+
+    if not table_sets:
+        raise ConfigError(f"No .toml table sets found in {tables_directory}.")
+    return table_sets
+
+
+def _piece_square_table(value: Any, location: str) -> tuple[int, ...]:
+    if not isinstance(value, list) or len(value) != 8:
+        raise ConfigError(f"{location} must contain eight ranks.")
+    flattened: list[int] = []
+    for rank_number, rank in enumerate(value, start=1):
+        if not isinstance(rank, list) or len(rank) != 8:
+            raise ConfigError(
+                f"{location} rank {rank_number} must contain eight values."
+            )
+        for square_value in rank:
+            if isinstance(square_value, bool) or not isinstance(square_value, int):
+                raise ConfigError(f"{location} values must be whole centipawns.")
+            flattened.append(square_value)
+    return tuple(flattened)
 
 
 def _load_toml(path: Path, label: str) -> dict[str, Any]:

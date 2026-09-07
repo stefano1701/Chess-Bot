@@ -39,6 +39,11 @@ def create_bot(
         else _profile_rng(profile, seed_offset)
     )
     bot_name = name or profile.name
+    piece_square_table_set = (
+        config.get_piece_square_table_set(profile.piece_square_table_set_id)
+        if profile.piece_square_weight > 0
+        else None
+    )
 
     if profile.strategy == "random":
         return RandomBot(name=bot_name, rng=rng)
@@ -48,6 +53,8 @@ def create_bot(
             mate_score=config.mate_score,
             draw_score=config.draw_score,
             piece_square_weight=profile.piece_square_weight,
+            piece_square_table_set=piece_square_table_set,
+            piece_square_weights=profile.piece_square_weights,
         )
         return OnePlyMaterialBot(evaluator=evaluator, name=bot_name, rng=rng)
     if profile.strategy == "minimax":
@@ -56,6 +63,8 @@ def create_bot(
             mate_score=config.mate_score,
             draw_score=config.draw_score,
             piece_square_weight=profile.piece_square_weight,
+            piece_square_table_set=piece_square_table_set,
+            piece_square_weights=profile.piece_square_weights,
         )
         return MinimaxBot(
             evaluator=evaluator,

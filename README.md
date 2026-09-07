@@ -84,18 +84,57 @@ so both colours are evaluated consistently. Material remains much more valuable:
 for example, developing a knight from `g1` to `f3` gains 50 positional centipawns,
 while losing that knight still costs 320 material centipawns.
 
-This first version deliberately uses one static table per piece throughout the
-game. It does not yet understand pawn structure, mobility, open files, bishop
-pairs, or that an active king becomes valuable in the endgame.
+This version deliberately uses one static table per piece throughout the game.
+It does not yet understand pawn structure, mobility, open files, bishop pairs,
+or that an active king becomes valuable in the endgame.
+
+## Tuning positional settings
+
+Positional profiles provide three levels of control:
+
+1. `piece_square_tables` scales the complete positional score.
+2. `[evaluation.piece_square_weights]` independently scales pawns, knights,
+   bishops, rooks, queens, and kings. Set any piece to 0 to disable its table.
+3. A table-set TOML file exposes all 64 values for all six pieces: 384 editable
+   centipawn bonuses and penalties.
+
+A profile's positional section looks like this:
+
+```toml
+[evaluation]
+piece_square_tables = 1.0
+piece_square_table_set = "simplified"
+
+[evaluation.piece_square_weights]
+pawn = 1.0
+knight = 1.5
+bishop = 1.0
+rook = 1.0
+queen = 0.5
+king = 0.0
+```
+
+The complete default tables are in
+[`piece-square-tables/simplified.toml`](piece-square-tables/simplified.toml).
+Each matrix starts with White's rank 1 and ends with rank 8; every row runs from
+file `a` to file `h`. Black automatically uses the vertically mirrored value.
+Positive numbers reward a square and negative numbers discourage it.
+
+To create another theory, copy that file to a new `.toml` file in the same
+directory, give it a new name under `[meta]`, and edit any values. All valid table
+files appear automatically in the profile-creation menu after restarting the
+application. Create a new bot profile for each experiment so its Elo history
+remains separate from bots whose behavior has changed.
 
 Choose **Create a material/positional bot profile** in the main menu to enter
-another set of values, a search depth, and a piece-square table weight. Weight 0
-means material only, 1 uses the normal positional values, and values such as 0.5
-or 1.5 make the positional influence weaker or stronger. Depth 1 creates the
-original one-ply strategy; depth 2 or higher creates a minimax profile. Each
-custom profile is saved as an editable TOML file in `profiles/` and automatically
-appears in the play, spectator, and tournament selection menus. Depth 4 and above
-may become slow without the pruning planned for a later milestone.
+another set of values, a search depth, a table set, an overall positional weight,
+and six piece-specific weights. Weight 0 means material only, 1 uses the values as
+written, and values such as 0.5 or 1.5 make an influence weaker or stronger.
+Depth 1 creates the original one-ply strategy; depth 2 or higher creates a minimax
+profile. Each custom profile is saved as an editable TOML file in `profiles/` and
+automatically appears in the play, spectator, and tournament selection menus.
+Depth 4 and above may become slow without the pruning planned for a later
+milestone.
 
 Choose **Run a bot tournament** to compare two bot players over multiple games.
 Each player may use a different profile, or both may use the same profile to show

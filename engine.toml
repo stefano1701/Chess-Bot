@@ -70,8 +70,18 @@ bishop_pair_bonus = 0
 
 [evaluation.piece_square_tables]
 enabled = true
-table_set = "simplified"
+directory = "piece-square-tables"
+default_table_set = "simplified"
 interpolate_by_phase = false
+
+# Default multipliers for the six tables. Profiles can override any of them.
+[evaluation.piece_square_weights]
+pawn = 1.0
+knight = 1.0
+bishop = 1.0
+rook = 1.0
+queen = 1.0
+king = 1.0
 
 [evaluation.mobility]
 enabled = false

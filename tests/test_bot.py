@@ -4,7 +4,7 @@ import unittest
 import chess
 
 from chess_bot.bot import MinimaxBot, OnePlyMaterialBot, RandomBot
-from chess_bot.config import MaterialValues
+from chess_bot.config import MaterialValues, load_engine_config
 from chess_bot.evaluation import MaterialEvaluator
 
 
@@ -54,10 +54,14 @@ class OnePlyMaterialBotTests(unittest.TestCase):
 
     def test_positional_tables_prefer_developing_a_knight(self) -> None:
         board = chess.Board("4k3/8/8/8/8/8/8/RN2K3 w Q - 0 1")
+        config = load_engine_config()
         positional = OnePlyMaterialBot(
             MaterialEvaluator(
                 MaterialValues(100, 320, 330, 500, 900),
                 piece_square_weight=1.0,
+                piece_square_table_set=config.get_piece_square_table_set(
+                    "simplified"
+                ),
             ),
             rng=random.Random(7),
         )

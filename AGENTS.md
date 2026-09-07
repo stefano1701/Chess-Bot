@@ -15,17 +15,17 @@ to a mature engine or hide the interesting decisions behind an external engine.
 
 ## Current milestone
 
-Version: 0.11.0
+Version: 0.12.0
 
 Three strategies are implemented: `random`, `one_ply`, and `minimax`. The one-ply
 strategy chooses the best immediate material result. Minimax searches to the
 profile's fixed depth, maximizing on White's turns and minimizing on Black's, so
 depth 2 examines the opponent's best immediate reply. Terminal mate and draw
-scores are respected at any searched depth. Profiles may add static piece-square
-tables to material at a configurable weight. There is no alpha-beta pruning, move
-ordering, pawn-structure or mobility evaluation, game-phase interpolation,
-tactical/quiescence search, opening book, tablebase, clock management, or online
-adapter yet.
+scores are respected at any searched depth. Profiles may add named, editable
+static piece-square table sets to material, with both an overall weight and six
+per-piece weights. There is no alpha-beta pruning, move ordering, pawn-structure
+or mobility evaluation, game-phase interpolation, tactical/quiescence search,
+opening book, tablebase, clock management, or online adapter yet.
 
 The terminal application currently supports:
 
@@ -40,8 +40,8 @@ The terminal application currently supports:
   Elo. Completed reports are timestamped and appended to a configurable local
   text file.
 - Interactive creation of material profiles with a configurable search depth.
-- An optional piece-square weight when creating profiles; zero keeps the original
-  material-only evaluator and one uses the built-in positional values.
+- A table-set chooser, overall piece-square weight, and six per-piece weights when
+  creating profiles. Zero keeps the original material-only evaluator.
 - Per-move node counts for minimax in human and spectator games.
 - Persistent profile Elo ratings with K=16, updated game-by-game for tournaments
   between different profiles. Same-profile self-play is explicitly unrated.
@@ -57,7 +57,10 @@ The terminal application currently supports:
 - `engine.toml`: the single source of truth for engine behavior and future
   shared tuning values. Read it before doing engine work.
 - `profiles/*.toml`: bot names, strategies, seeds, and optional material-value
-  overrides and search depth. One-ply and two-ply examples are included.
+  overrides, search depth, table set, and positional weights. One-ply and two-ply
+  examples are included.
+- `piece-square-tables/*.toml`: named positional table sets. Every file contains
+  all 384 editable square values and appears in the profile-creation chooser.
 - `src/chess_bot/config.py`: loads, validates, and creates profiles.
 - `src/chess_bot/engine.py`: constructs the selected engine implementation.
   Add future strategies here rather than branching in the terminal UI.
@@ -103,14 +106,20 @@ the tournament runner deliberately overrides profile seeds with its reported
 tournament seed. `CHESS_BOT_CONFIG` may point to an alternate global TOML file;
 its profiles directory is resolved relative to that file.
 
-`evaluation.piece_square_tables.enabled` makes the built-in tables available.
-`evaluation.weights.piece_square_tables` is the default profile weight and
-remains zero so existing material profiles do not silently change. A profile may
-override it with `[evaluation].piece_square_tables`: zero is material only, one
-uses the table values as written, and other non-negative numbers scale them. The
-built-in `two-ply-positional` profile uses weight 1. Black square values are
-looked up through `chess.square_mirror()`. The current tables are deliberately
-static and have no opening/endgame interpolation.
+`evaluation.piece_square_tables.enabled` makes table sets available. Its
+`directory` is resolved beside `engine.toml`, and `default_table_set` must match
+the stem of a valid TOML file there. `evaluation.weights.piece_square_tables` is
+the default overall profile weight and remains zero so existing material profiles
+do not silently change. A profile may override the overall weight and table-set
+ID under `[evaluation]`, plus any of the six defaults under
+`[evaluation.piece_square_weights]`. All weights are non-negative floats.
+
+Every table-set file must provide an 8×8 integer-centipawn matrix for each of
+`pawn`, `knight`, `bishop`, `rook`, `queen`, and `king`. Matrices are rank 1 to 8,
+with each row ordered file a to h. Black square values are looked up through
+`chess.square_mirror()`. The built-in `two-ply-positional` profile selects the
+`simplified` set with all weights at 1. The tables remain static and have no
+opening/endgame interpolation.
 
 `[tournament]` supplies the default number of games, default seed, progress-bar
 width, and results log path. A seed of `-1` generates a fresh non-negative seed;

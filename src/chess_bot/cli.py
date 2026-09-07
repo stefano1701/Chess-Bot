@@ -13,6 +13,7 @@ from chess_bot.config import (
     ConfigError,
     EngineConfig,
     MaterialValues,
+    PieceSquareWeights,
     load_engine_config,
     save_material_profile,
 )
@@ -99,7 +100,11 @@ def profile_summary(
             f"R={values.rook} Q={values.queen}"
         )
         if profile.piece_square_weight > 0:
-            summary += f"; positional tables ×{profile.piece_square_weight:g}"
+            summary += (
+                f"; PST {profile.piece_square_table_set_id} "
+                f"×{profile.piece_square_weight:g} "
+                f"[{_piece_square_weights_text(profile.piece_square_weights)}]"
+            )
 
     if ratings is not None:
         rating = ratings.rating_for(profile.id)
@@ -233,9 +238,14 @@ def format_tournament_progress(
             ]
         )
         if stats.profile.piece_square_weight > 0:
-            lines.append(
-                "│   positional · piece-square tables "
-                f"×{stats.profile.piece_square_weight:g}"
+            lines.extend(
+                [
+                    "│   positional · "
+                    f"{stats.profile.piece_square_table_set_id} tables "
+                    f"×{stats.profile.piece_square_weight:g}",
+                    "│   table weights · "
+                    f"{_piece_square_weights_text(stats.profile.piece_square_weights)}",
+                ]
             )
         elo_line = _profile_elo_line(result, player_number)
         if elo_line is not None:
@@ -482,6 +492,8 @@ def create_material_profile_interactively(config: EngineConfig) -> str | None:
     print("A ply is one player's move. Depth 2 also examines the opponent's reply.")
     search_depth = _prompt_search_depth(config.search_max_depth)
     piece_square_weight = 0.0
+    piece_square_table_set_id = config.default_piece_square_table_set_id
+    piece_square_weights = config.default_piece_square_weights
     if config.piece_square_tables_enabled:
         print(
             "Piece-square tables reward useful squares. "
@@ -490,12 +502,29 @@ def create_material_profile_interactively(config: EngineConfig) -> str | None:
         piece_square_weight = _prompt_piece_square_weight(
             config.default_piece_square_weight
         )
+        if piece_square_weight > 0:
+            piece_square_table_set_id = _prompt_piece_square_table_set(config)
+            print(
+                "Scale each piece's table independently. Use 0 to disable that "
+                "piece's positional values."
+            )
+            defaults = config.default_piece_square_weights
+            piece_square_weights = PieceSquareWeights(
+                pawn=_prompt_piece_square_weight(defaults.pawn, "Pawn table"),
+                knight=_prompt_piece_square_weight(defaults.knight, "Knight table"),
+                bishop=_prompt_piece_square_weight(defaults.bishop, "Bishop table"),
+                rook=_prompt_piece_square_weight(defaults.rook, "Rook table"),
+                queen=_prompt_piece_square_weight(defaults.queen, "Queen table"),
+                king=_prompt_piece_square_weight(defaults.king, "King table"),
+            )
     profile_path = save_material_profile(
         config,
         name,
         material,
         search_depth=search_depth,
         piece_square_weight=piece_square_weight,
+        piece_square_table_set_id=piece_square_table_set_id,
+        piece_square_weights=piece_square_weights,
     )
     return profile_path.stem
 
@@ -530,9 +559,12 @@ def _prompt_search_depth(default: int) -> int:
         print("Enter a positive whole number. Depth 4 and above may be slow.")
 
 
-def _prompt_piece_square_weight(default: float) -> float:
+def _prompt_piece_square_weight(
+    default: float,
+    label: str = "Overall piece-square table",
+) -> float:
     while True:
-        answer = input(f"Piece-square table weight [{default:g}] › ").strip()
+        answer = input(f"{label} weight [{default:g}] › ").strip()
         if answer == "":
             return default
         try:
@@ -543,6 +575,53 @@ def _prompt_piece_square_weight(default: float) -> float:
         if math.isfinite(weight) and weight >= 0:
             return weight
         print("Enter a non-negative number, such as 0, 0.5, or 1.")
+
+
+def _prompt_piece_square_table_set(config: EngineConfig) -> str:
+    default_id = config.default_piece_square_table_set_id
+    others = sorted(
+        (
+            table_set
+            for table_set in config.piece_square_table_sets.values()
+            if table_set.id != default_id
+        ),
+        key=lambda table_set: table_set.name.lower(),
+    )
+    table_sets = [config.get_piece_square_table_set(default_id), *others]
+    while True:
+        print("\nPiece-square table sets")
+        for index, table_set in enumerate(table_sets, start=1):
+            default_marker = " (default)" if table_set.id == default_id else ""
+            print(
+                f"{index}. {table_set.name} [{table_set.id}]{default_marker} — "
+                f"{table_set.description}"
+            )
+        answer = input("Choose a table set › ").strip()
+        if answer == "":
+            return default_id
+        try:
+            selected_index = int(answer) - 1
+        except ValueError:
+            print("Choose one of the listed table-set numbers.")
+            continue
+        if 0 <= selected_index < len(table_sets):
+            return table_sets[selected_index].id
+        print("Choose one of the listed table-set numbers.")
+
+
+def _piece_square_weights_text(weights: PieceSquareWeights) -> str:
+    values = weights.as_dict()
+    labels = {
+        "pawn": "P",
+        "knight": "N",
+        "bishop": "B",
+        "rook": "R",
+        "queen": "Q",
+        "king": "K",
+    }
+    return " ".join(
+        f"{labels[piece]}={values[piece]:g}" for piece in labels
+    )
 
 
 def _bot_move_status(bot: ChessBot, notation: str) -> str:
