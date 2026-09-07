@@ -47,6 +47,7 @@ def create_bot(
             profile.material,
             mate_score=config.mate_score,
             draw_score=config.draw_score,
+            piece_square_weight=profile.piece_square_weight,
         )
         return OnePlyMaterialBot(evaluator=evaluator, name=bot_name, rng=rng)
     if profile.strategy == "minimax":
@@ -54,6 +55,7 @@ def create_bot(
             profile.material,
             mate_score=config.mate_score,
             draw_score=config.draw_score,
+            piece_square_weight=profile.piece_square_weight,
         )
         return MinimaxBot(
             evaluator=evaluator,

@@ -15,15 +15,17 @@ to a mature engine or hide the interesting decisions behind an external engine.
 
 ## Current milestone
 
-Version: 0.10.0
+Version: 0.11.0
 
 Three strategies are implemented: `random`, `one_ply`, and `minimax`. The one-ply
 strategy chooses the best immediate material result. Minimax searches to the
 profile's fixed depth, maximizing on White's turns and minimizing on Black's, so
 depth 2 examines the opponent's best immediate reply. Terminal mate and draw
-scores are respected at any searched depth. There is no alpha-beta pruning, move
-ordering, positional evaluation, tactical/quiescence search, opening book,
-tablebase, clock management, or online adapter yet.
+scores are respected at any searched depth. Profiles may add static piece-square
+tables to material at a configurable weight. There is no alpha-beta pruning, move
+ordering, pawn-structure or mobility evaluation, game-phase interpolation,
+tactical/quiescence search, opening book, tablebase, clock management, or online
+adapter yet.
 
 The terminal application currently supports:
 
@@ -38,6 +40,8 @@ The terminal application currently supports:
   Elo. Completed reports are timestamped and appended to a configurable local
   text file.
 - Interactive creation of material profiles with a configurable search depth.
+- An optional piece-square weight when creating profiles; zero keeps the original
+  material-only evaluator and one uses the built-in positional values.
 - Per-move node counts for minimax in human and spectator games.
 - Persistent profile Elo ratings with K=16, updated game-by-game for tournaments
   between different profiles. Same-profile self-play is explicitly unrated.
@@ -59,7 +63,8 @@ The terminal application currently supports:
   Add future strategies here rather than branching in the terminal UI.
 - `src/chess_bot/bot.py`: contains `RandomBot`, `OnePlyMaterialBot`, and the
   recursive fixed-depth `MinimaxBot`.
-- `src/chess_bot/evaluation.py`: terminal-outcome and material evaluation.
+- `src/chess_bot/evaluation.py`: terminal-outcome, material, and static
+  piece-square evaluation.
 - `src/chess_bot/game.py`: move parsing, move history, and result formatting.
 - `src/chess_bot/display.py`: Unicode and terminal-colour board rendering.
 - `src/chess_bot/tournament.py`: headless game loop, alternating scheduling,
@@ -97,6 +102,15 @@ makes random moves and equal-score tie breaking reproducible outside tournaments
 the tournament runner deliberately overrides profile seeds with its reported
 tournament seed. `CHESS_BOT_CONFIG` may point to an alternate global TOML file;
 its profiles directory is resolved relative to that file.
+
+`evaluation.piece_square_tables.enabled` makes the built-in tables available.
+`evaluation.weights.piece_square_tables` is the default profile weight and
+remains zero so existing material profiles do not silently change. A profile may
+override it with `[evaluation].piece_square_tables`: zero is material only, one
+uses the table values as written, and other non-negative numbers scale them. The
+built-in `two-ply-positional` profile uses weight 1. Black square values are
+looked up through `chess.square_mirror()`. The current tables are deliberately
+static and have no opening/endgame interpolation.
 
 `[tournament]` supplies the default number of games, default seed, progress-bar
 width, and results log path. A seed of `-1` generates a fresh non-negative seed;
@@ -147,12 +161,13 @@ approximate.
 1. Random legal moves (complete).
 2. Material evaluation with one-ply move selection and profiles (complete).
 3. Minimax search to a fixed configurable depth (current).
-4. Alpha-beta pruning and basic move ordering (next).
-5. Quiescence search for tactical stability.
-6. Positional features: piece-square tables, mobility, pawn structure, king
-   safety, space, development, and endgame adjustments.
-7. Iterative deepening, transposition tables, and time management.
-8. Online-bot protocol adapter, resilience, and observability.
+4. Static piece-square positional evaluation (current).
+5. Alpha-beta pruning and basic move ordering (next).
+6. Quiescence search for tactical stability.
+7. Further positional features: mobility, pawn structure, dynamic king safety,
+   space, development, and endgame adjustments.
+8. Iterative deepening, transposition tables, and time management.
+9. Online-bot protocol adapter, resilience, and observability.
 
 This sequence is guidance, not permission to implement future stages early.
 Follow Mike's requested pace.

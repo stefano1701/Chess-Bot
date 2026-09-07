@@ -98,6 +98,8 @@ def profile_summary(
             f"P={values.pawn} N={values.knight} B={values.bishop} "
             f"R={values.rook} Q={values.queen}"
         )
+        if profile.piece_square_weight > 0:
+            summary += f"; positional tables ×{profile.piece_square_weight:g}"
 
     if ratings is not None:
         rating = ratings.rating_for(profile.id)
@@ -230,6 +232,11 @@ def format_tournament_progress(
                 f"│   {_profile_strategy_text(stats.profile)}",
             ]
         )
+        if stats.profile.piece_square_weight > 0:
+            lines.append(
+                "│   positional · piece-square tables "
+                f"×{stats.profile.piece_square_weight:g}"
+            )
         elo_line = _profile_elo_line(result, player_number)
         if elo_line is not None:
             lines.append(elo_line)
@@ -457,7 +464,7 @@ def run_bot_tournament_interactively(
 def create_material_profile_interactively(config: EngineConfig) -> str | None:
     clear_screen()
     print(TITLE)
-    print("\nCreate a material-search bot profile\n")
+    print("\nCreate a material/positional bot profile\n")
     name = input("Profile name (blank to cancel) › ").strip()
     if not name:
         return None
@@ -474,11 +481,21 @@ def create_material_profile_interactively(config: EngineConfig) -> str | None:
     )
     print("A ply is one player's move. Depth 2 also examines the opponent's reply.")
     search_depth = _prompt_search_depth(config.search_max_depth)
+    piece_square_weight = 0.0
+    if config.piece_square_tables_enabled:
+        print(
+            "Piece-square tables reward useful squares. "
+            "Use 0 for material only or 1 for the normal positional values."
+        )
+        piece_square_weight = _prompt_piece_square_weight(
+            config.default_piece_square_weight
+        )
     profile_path = save_material_profile(
         config,
         name,
         material,
         search_depth=search_depth,
+        piece_square_weight=piece_square_weight,
     )
     return profile_path.stem
 
@@ -511,6 +528,21 @@ def _prompt_search_depth(default: int) -> int:
         if depth > 0:
             return depth
         print("Enter a positive whole number. Depth 4 and above may be slow.")
+
+
+def _prompt_piece_square_weight(default: float) -> float:
+    while True:
+        answer = input(f"Piece-square table weight [{default:g}] › ").strip()
+        if answer == "":
+            return default
+        try:
+            weight = float(answer)
+        except ValueError:
+            print("Enter a non-negative number, such as 0, 0.5, or 1.")
+            continue
+        if math.isfinite(weight) and weight >= 0:
+            return weight
+        print("Enter a non-negative number, such as 0, 0.5, or 1.")
 
 
 def _bot_move_status(bot: ChessBot, notation: str) -> str:
@@ -656,7 +688,7 @@ def main() -> None:
         print(f"Default: {profile_summary(config.default_profile, ratings)}")
         print("1. Play against a bot")
         print("2. Watch bot vs bot")
-        print("3. Create a material-search bot profile")
+        print("3. Create a material/positional bot profile")
         print("4. Run a bot tournament")
         print("5. Quit")
         choice = input("\nChoose an option › ").strip().lower()

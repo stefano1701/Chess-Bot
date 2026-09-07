@@ -52,6 +52,18 @@ class OnePlyMaterialBotTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "finished position"):
             self.bot.choose_move(board)
 
+    def test_positional_tables_prefer_developing_a_knight(self) -> None:
+        board = chess.Board("4k3/8/8/8/8/8/8/RN2K3 w Q - 0 1")
+        positional = OnePlyMaterialBot(
+            MaterialEvaluator(
+                MaterialValues(100, 320, 330, 500, 900),
+                piece_square_weight=1.0,
+            ),
+            rng=random.Random(7),
+        )
+
+        self.assertEqual(positional.choose_move(board), chess.Move.from_uci("b1c3"))
+
 
 class MinimaxBotTests(unittest.TestCase):
     def setUp(self) -> None:

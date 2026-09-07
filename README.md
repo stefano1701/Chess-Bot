@@ -3,6 +3,7 @@
 A deliberately simple chess bot for learning how chess engines evaluate positions
 and search game trees. It includes random and one-ply baselines plus fixed-depth
 minimax, which assumes the opponent will choose their strongest available reply.
+An optional piece-square evaluation adds a first layer of positional knowledge.
 
 ## Current features
 
@@ -11,7 +12,8 @@ minimax, which assumes the opponent will choose their strongest available reply.
 - Run headless multi-game tournaments with alternating colours, a live progress
   bar, elapsed timer, replayable seed, and overall/White/Black statistics
 - Maintain persistent Elo ratings and lifetime results for bot profiles
-- Create material-value profiles with a chosen search depth from the terminal menu
+- Create material/positional profiles with a chosen search depth and positional
+  weight from the terminal menu
 - See how many positions minimax examined after each move
 - Filled Unicode checkerboard with white and shaded squares, rotated to the
   human player's point of view
@@ -59,12 +61,14 @@ default_profile = "two-ply-material"
 profiles_directory = "profiles"
 ```
 
-Four profiles are included:
+Five profiles are included:
 
 - **Random Bot:** chooses any legal move uniformly.
 - **Standard Material:** one ply; `P=100, N=320, B=330, R=500, Q=900`.
 - **Equal Minor Pieces:** one ply; `P=100, N=300, B=300, R=500, Q=900`.
 - **Two-Ply Material:** minimax depth 2; standard material values.
+- **Two-Ply Positional:** minimax depth 2; standard material plus piece-square
+  tables at weight 1.
 
 The one-ply bots inspect every legal move and select the best immediate material
 score. The minimax bot also inspects every legal opponent reply, assumes the
@@ -72,12 +76,26 @@ opponent chooses the reply worst for it, and selects the move with the best
 surviving score. Equal best moves are selected randomly. Search depth is measured
 in plies: one ply is one player's move, so depth 2 means our move plus their reply.
 
-Choose **Create a material-search bot profile** in the main menu to enter another
-set of values and a search depth. Depth 1 creates the original one-ply strategy;
-depth 2 or higher creates a minimax profile. Each custom profile is saved as an
-editable TOML file in `profiles/` and automatically appears in the play,
-spectator, and tournament selection menus. Depth 4 and above may become slow
-without the pruning planned for the next milestone.
+The positional profile adds small centipawn bonuses or penalties according to the
+square occupied by each piece. Its tables encourage central knights, developed
+bishops and pawns, active rooks and queens, advanced pawns, and king safety near
+the castling squares. Black uses a vertically mirrored copy of the same tables,
+so both colours are evaluated consistently. Material remains much more valuable:
+for example, developing a knight from `g1` to `f3` gains 50 positional centipawns,
+while losing that knight still costs 320 material centipawns.
+
+This first version deliberately uses one static table per piece throughout the
+game. It does not yet understand pawn structure, mobility, open files, bishop
+pairs, or that an active king becomes valuable in the endgame.
+
+Choose **Create a material/positional bot profile** in the main menu to enter
+another set of values, a search depth, and a piece-square table weight. Weight 0
+means material only, 1 uses the normal positional values, and values such as 0.5
+or 1.5 make the positional influence weaker or stronger. Depth 1 creates the
+original one-ply strategy; depth 2 or higher creates a minimax profile. Each
+custom profile is saved as an editable TOML file in `profiles/` and automatically
+appears in the play, spectator, and tournament selection menus. Depth 4 and above
+may become slow without the pruning planned for a later milestone.
 
 Choose **Run a bot tournament** to compare two bot players over multiple games.
 Each player may use a different profile, or both may use the same profile to show
@@ -161,10 +179,11 @@ python -m unittest discover -s tests
 
 1. Material-only one-ply evaluation (complete).
 2. Fixed-depth minimax so the bot examines opponent replies (current).
-3. Add alpha-beta pruning and move ordering.
-4. Expand positional evaluation (piece-square tables, pawn structure, mobility,
-   king safety, and more).
-5. Add time management and an adapter for online bot play.
+3. Add piece-square positional evaluation (complete).
+4. Add alpha-beta pruning and move ordering.
+5. Expand positional evaluation (pawn structure, mobility, dynamic king safety,
+   and more).
+6. Add time management and an adapter for online bot play.
 
 The engine and terminal UI are kept separate so each of these steps can be added
 without rewriting the interface.

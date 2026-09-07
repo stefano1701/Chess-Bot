@@ -50,7 +50,7 @@ tempo_bonus = 0
 
 [evaluation.weights]
 material = 1.0
-piece_square_tables = 0.0
+piece_square_tables = 0.0      # Default; individual profiles may override this.
 mobility = 0.0
 pawn_structure = 0.0
 king_safety = 0.0
@@ -69,9 +69,8 @@ king = 0
 bishop_pair_bonus = 0
 
 [evaluation.piece_square_tables]
-enabled = false
-opening_table = "none"
-endgame_table = "none"
+enabled = true
+table_set = "simplified"
 interpolate_by_phase = false
 
 [evaluation.mobility]

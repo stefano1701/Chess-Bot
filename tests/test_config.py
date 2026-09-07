@@ -20,7 +20,13 @@ class ProfileConfigTests(unittest.TestCase):
 
         self.assertEqual(config.default_profile_id, "two-ply-material")
         self.assertTrue(
-            {"random", "standard-material", "equal-minors", "two-ply-material"}
+            {
+                "random",
+                "standard-material",
+                "equal-minors",
+                "two-ply-material",
+                "two-ply-positional",
+            }
             <= set(config.profiles)
         )
         self.assertIsInstance(create_bot(config, "random"), RandomBot)
@@ -30,6 +36,12 @@ class ProfileConfigTests(unittest.TestCase):
         minimax_bot = create_bot(config, "two-ply-material")
         self.assertIsInstance(minimax_bot, MinimaxBot)
         self.assertEqual(minimax_bot.depth, 2)
+        positional = config.get_profile("two-ply-positional")
+        positional_bot = create_bot(config, positional.id)
+        self.assertEqual(positional.search_depth, 2)
+        self.assertEqual(positional.piece_square_weight, 1.0)
+        self.assertEqual(positional_bot.evaluator.piece_square_weight, 1.0)
+        self.assertEqual(config.get_profile("two-ply-material").piece_square_weight, 0)
         self.assertEqual(config.tournament_default_games, 20)
         self.assertEqual(config.tournament_progress_bar_width, 32)
         self.assertEqual(config.tournament_results_file.name, "tournament-results.txt")
@@ -48,7 +60,7 @@ class ProfileConfigTests(unittest.TestCase):
         self.assertEqual(standard_bot.evaluator.values, standard)
         self.assertEqual(equal_minors_bot.evaluator.values, equal_minors)
 
-    def test_material_search_is_the_only_enabled_evaluation(self) -> None:
+    def test_piece_square_evaluation_is_available_but_off_by_default(self) -> None:
         config = load_engine_config()
 
         self.assertTrue(config.settings["search"]["enabled"])
@@ -60,6 +72,15 @@ class ProfileConfigTests(unittest.TestCase):
         self.assertIsNone(config.tournament_default_seed)
         self.assertTrue(config.settings["evaluation"]["enabled"])
         self.assertTrue(config.settings["evaluation"]["material"]["enabled"])
+        self.assertTrue(config.piece_square_tables_enabled)
+        self.assertEqual(config.default_piece_square_weight, 0)
+        self.assertTrue(
+            config.settings["evaluation"]["piece_square_tables"]["enabled"]
+        )
+        self.assertEqual(
+            config.settings["evaluation"]["piece_square_tables"]["table_set"],
+            "simplified",
+        )
         self.assertFalse(config.settings["tactics"]["enabled"])
 
     def test_configured_seed_makes_random_profile_repeatable(self) -> None:
@@ -127,6 +148,28 @@ class ProfileConfigTests(unittest.TestCase):
         self.assertEqual(profile.search_depth, 3)
         self.assertEqual(create_bot(load_engine_config(config_path), profile.id).depth, 3)
 
+    def test_custom_profile_saves_piece_square_weight(self) -> None:
+        config_path = self._write_config(
+            profile_name="Initial Bot",
+            strategy="random",
+            piece_square_tables_enabled=True,
+        )
+        config = load_engine_config(config_path)
+        values = MaterialValues(100, 320, 330, 500, 900)
+
+        saved_path = save_material_profile(
+            config,
+            "Half Positional",
+            values,
+            search_depth=2,
+            piece_square_weight=0.5,
+        )
+        profile = load_engine_config(config_path).get_profile(saved_path.stem)
+
+        self.assertEqual(profile.piece_square_weight, 0.5)
+        positional_bot = create_bot(load_engine_config(config_path), profile.id)
+        self.assertEqual(positional_bot.depth, 2)
+
     def test_unsupported_profile_strategy_has_a_clear_error(self) -> None:
         config_path = self._write_config(
             profile_name="Future Bot",
@@ -142,6 +185,7 @@ class ProfileConfigTests(unittest.TestCase):
         profile_name: str,
         strategy: str,
         random_seed: int = -1,
+        piece_square_tables_enabled: bool = False,
     ) -> Path:
         temporary_directory = tempfile.TemporaryDirectory()
         self.addCleanup(temporary_directory.cleanup)
@@ -156,6 +200,8 @@ class ProfileConfigTests(unittest.TestCase):
             "[evaluation]\n"
             "mate_score = 100000\n"
             "draw_score = 0\n\n"
+            "[evaluation.weights]\n"
+            "piece_square_tables = 0.0\n\n"
             "[evaluation.material]\n"
             "pawn = 100\n"
             "knight = 320\n"
@@ -163,6 +209,8 @@ class ProfileConfigTests(unittest.TestCase):
             "rook = 500\n"
             "queen = 900\n"
             "king = 0\n\n"
+            "[evaluation.piece_square_tables]\n"
+            f"enabled = {str(piece_square_tables_enabled).lower()}\n\n"
             "[tournament]\n"
             "default_games = 20\n"
             "progress_bar_width = 32\n"

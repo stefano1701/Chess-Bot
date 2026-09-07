@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -61,6 +62,7 @@ class BotProfile:
     description: str
     random_seed: int | None
     material: MaterialValues
+    piece_square_weight: float
     search_depth: int
 
 
@@ -70,6 +72,8 @@ class EngineConfig:
     profiles_directory: Path
     default_profile_id: str
     default_material: MaterialValues
+    piece_square_tables_enabled: bool
+    default_piece_square_weight: float
     mate_score: int
     draw_score: int
     search_max_depth: int
@@ -119,7 +123,48 @@ def load_engine_config(path: str | Path | None = None) -> EngineConfig:
         raise ConfigError("engine.toml must contain [evaluation.material].")
 
     default_material = _material_values(material_settings, None, "evaluation.material")
-    mate_score = _non_negative_integer(evaluation, "mate_score", "evaluation.mate_score")
+    evaluation_weights = evaluation.get("weights", {})
+    if not isinstance(evaluation_weights, dict):
+        raise ConfigError("evaluation.weights must be a table.")
+    piece_square_settings = evaluation.get("piece_square_tables", {})
+    if not isinstance(piece_square_settings, dict):
+        raise ConfigError("evaluation.piece_square_tables must be a table.")
+    piece_square_tables_enabled = _boolean(
+        piece_square_settings,
+        "enabled",
+        "evaluation.piece_square_tables.enabled",
+        default=False,
+    )
+    piece_square_table_set = piece_square_settings.get("table_set", "simplified")
+    if piece_square_tables_enabled and piece_square_table_set != "simplified":
+        raise ConfigError(
+            "evaluation.piece_square_tables.table_set must currently be "
+            "'simplified'."
+        )
+    interpolate_piece_square_tables = _boolean(
+        piece_square_settings,
+        "interpolate_by_phase",
+        "evaluation.piece_square_tables.interpolate_by_phase",
+        default=False,
+    )
+    if interpolate_piece_square_tables:
+        raise ConfigError(
+            "Piece-square game-phase interpolation is not implemented yet."
+        )
+    default_piece_square_weight = _non_negative_number(
+        evaluation_weights,
+        "piece_square_tables",
+        "evaluation.weights.piece_square_tables",
+        default=0.0,
+    )
+    if not piece_square_tables_enabled and default_piece_square_weight > 0:
+        raise ConfigError(
+            "evaluation.weights.piece_square_tables must be 0 when "
+            "evaluation.piece_square_tables.enabled is false."
+        )
+    mate_score = _non_negative_integer(
+        evaluation, "mate_score", "evaluation.mate_score"
+    )
     draw_score = _integer(evaluation, "draw_score", "evaluation.draw_score")
     search = settings.get("search", {})
     if not isinstance(search, dict):
@@ -173,6 +218,8 @@ def load_engine_config(path: str | Path | None = None) -> EngineConfig:
     profiles = _load_profiles(
         profiles_directory,
         default_material,
+        piece_square_tables_enabled,
+        default_piece_square_weight,
         search_max_depth,
     )
 
@@ -186,6 +233,8 @@ def load_engine_config(path: str | Path | None = None) -> EngineConfig:
         profiles_directory=profiles_directory,
         default_profile_id=default_profile_id,
         default_material=default_material,
+        piece_square_tables_enabled=piece_square_tables_enabled,
+        default_piece_square_weight=default_piece_square_weight,
         mate_score=mate_score,
         draw_score=draw_score,
         search_max_depth=search_max_depth,
@@ -206,6 +255,7 @@ def save_material_profile(
     name: str,
     material: MaterialValues,
     search_depth: int = 1,
+    piece_square_weight: float = 0.0,
 ) -> Path:
     """Create a uniquely named material-search profile and return its path."""
     clean_name = name.strip()
@@ -213,6 +263,15 @@ def save_material_profile(
         raise ConfigError("Profile name cannot be empty.")
     if search_depth <= 0:
         raise ConfigError("Search depth must be positive.")
+    if (
+        isinstance(piece_square_weight, bool)
+        or not isinstance(piece_square_weight, (int, float))
+        or not math.isfinite(piece_square_weight)
+        or piece_square_weight < 0
+    ):
+        raise ConfigError("Piece-square weight must be a non-negative number.")
+    if piece_square_weight > 0 and not config.piece_square_tables_enabled:
+        raise ConfigError("Piece-square tables are disabled in engine.toml.")
 
     profile_id = _unique_profile_id(config.profiles_directory, clean_name)
     profile_path = config.profiles_directory / f"{profile_id}.toml"
@@ -223,6 +282,8 @@ def save_material_profile(
         if search_depth == 1
         else f"Custom depth-{search_depth} minimax material profile."
     )
+    if piece_square_weight > 0:
+        description = description.removesuffix(".") + " with positional tables."
     contents = (
         "[profile]\n"
         f"name = {json.dumps(clean_name, ensure_ascii=False)}\n"
@@ -231,6 +292,8 @@ def save_material_profile(
         "random_seed = -1\n\n"
         "[search]\n"
         f"depth = {search_depth}\n\n"
+        "[evaluation]\n"
+        f"piece_square_tables = {float(piece_square_weight)}\n\n"
         "[material]\n"
         + "".join(f"{piece} = {values[piece]}\n" for piece in MATERIAL_PIECES)
     )
@@ -242,6 +305,8 @@ def save_material_profile(
 def _load_profiles(
     profiles_directory: Path,
     default_material: MaterialValues,
+    piece_square_tables_enabled: bool,
+    default_piece_square_weight: float,
     default_search_depth: int,
 ) -> dict[str, BotProfile]:
     if not profiles_directory.is_dir():
@@ -286,6 +351,20 @@ def _load_profiles(
         material = _material_values(
             material_overrides or {}, default_material, f"{profile_id}.material"
         )
+        evaluation_overrides = data.get("evaluation", {})
+        if not isinstance(evaluation_overrides, dict):
+            raise ConfigError(f"{profile_id}.evaluation must be a table.")
+        piece_square_weight = _non_negative_number(
+            evaluation_overrides,
+            "piece_square_tables",
+            f"{profile_id}.evaluation.piece_square_tables",
+            default=default_piece_square_weight,
+        )
+        if piece_square_weight > 0 and not piece_square_tables_enabled:
+            raise ConfigError(
+                f"{profile_id} enables piece-square tables, but "
+                "evaluation.piece_square_tables.enabled is false."
+            )
         search_overrides = data.get("search", {})
         if not isinstance(search_overrides, dict):
             raise ConfigError(f"{profile_id}.search must be a table.")
@@ -307,6 +386,7 @@ def _load_profiles(
             description=description.strip(),
             random_seed=None if configured_seed == -1 else configured_seed,
             material=material,
+            piece_square_weight=piece_square_weight,
             search_depth=search_depth,
         )
 
@@ -356,6 +436,35 @@ def _integer(
     if isinstance(value, bool) or not isinstance(value, int):
         raise ConfigError(f"{location} must be an integer.")
     return value
+
+
+def _boolean(
+    values: dict[str, Any],
+    key: str,
+    location: str,
+    default: bool,
+) -> bool:
+    value = values.get(key, default)
+    if not isinstance(value, bool):
+        raise ConfigError(f"{location} must be true or false.")
+    return value
+
+
+def _non_negative_number(
+    values: dict[str, Any],
+    key: str,
+    location: str,
+    default: float,
+) -> float:
+    value = values.get(key, default)
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or not math.isfinite(value)
+        or value < 0
+    ):
+        raise ConfigError(f"{location} must be a non-negative number.")
+    return float(value)
 
 
 def _non_negative_integer(

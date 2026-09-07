@@ -13,6 +13,7 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10 compatibility.
 
 from chess_bot.cli import (
     create_material_profile_interactively,
+    profile_summary,
     prompt_bot_profile,
     prompt_tournament_game_count,
     prompt_tournament_seed,
@@ -21,6 +22,11 @@ from chess_bot.config import load_engine_config
 
 
 class ProfileMenuTests(unittest.TestCase):
+    def test_positional_profile_summary_shows_its_weight(self) -> None:
+        profile = load_engine_config().get_profile("two-ply-positional")
+
+        self.assertIn("positional tables ×1", profile_summary(profile))
+
     def test_blank_profile_selection_uses_the_default(self) -> None:
         config = load_engine_config()
 
@@ -40,7 +46,7 @@ class ProfileMenuTests(unittest.TestCase):
             config,
             profiles_directory=Path(temporary_directory.name),
         )
-        answers = ["My Values", "", "300", "300", "", "", ""]
+        answers = ["My Values", "", "300", "300", "", "", "", "1.5"]
 
         with (
             patch("chess_bot.cli.clear_screen"),
@@ -59,6 +65,7 @@ class ProfileMenuTests(unittest.TestCase):
         self.assertEqual(profile_data["material"]["queen"], 900)
         self.assertEqual(profile_data["profile"]["strategy"], "minimax")
         self.assertEqual(profile_data["search"]["depth"], 2)
+        self.assertEqual(profile_data["evaluation"]["piece_square_tables"], 1.5)
 
     def test_tournament_game_count_rejects_invalid_input(self) -> None:
         with (

@@ -1,0 +1,14 @@
+[profile]
+name = "Two-Ply Positional"
+strategy = "minimax"
+description = "Adds piece-square values for activity, development, and king safety."
+random_seed = -1
+
+[search]
+depth = 2
+
+[evaluation]
+piece_square_tables = 1.0
+
+# Material values are inherited from engine.toml:
+# pawn=100, knight=320, bishop=330, rook=500, queen=900.
