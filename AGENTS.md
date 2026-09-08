@@ -15,7 +15,7 @@ to a mature engine or hide the interesting decisions behind an external engine.
 
 ## Current milestone
 
-Version: 0.12.1
+Version: 0.13.0
 
 Three strategies are implemented: `random`, `one_ply`, and `minimax`. The one-ply
 strategy chooses the best immediate material result. Minimax searches to the
@@ -39,6 +39,11 @@ The terminal application currently supports:
   speed, an approximate score confidence interval, and tournament performance
   Elo. Completed reports are timestamped and appended to a configurable local
   text file.
+- Headless round-robin tournaments for two to eight player slots. Every pairing
+  plays a configurable number of games in each colour, giving every entrant an
+  exactly balanced White/Black schedule. Player slots remain separate when a
+  profile is selected more than once; games between the same profile ID are
+  unrated. Live and logged reports contain standings and colour splits.
 - Interactive creation of material profiles with a configurable search depth.
 - A table-set chooser, overall piece-square weight, and six per-piece weights when
   creating profiles. Zero keeps the original material-only evaluator.
@@ -58,8 +63,9 @@ The terminal application currently supports:
   shared tuning values. Read it before doing engine work.
 - `profiles/*.toml`: bot names, strategies, seeds, and optional material-value
   overrides, search depth, table set, and positional weights. Bundled examples
-  include ten material-only depth-2 profiles drawn from the complete historical
-  value sets in the Chess Programming Wiki Point Value table.
+  include eleven material-only depth-2 profiles drawn from the historical value
+  sets in the Chess Programming Wiki Point Value table. Coxeter's otherwise
+  unspecified pawn is explicitly assumed to be 100.
 - `piece-square-tables/*.toml`: named positional table sets. Every file contains
   all 384 editable square values and appears in the profile-creation chooser.
 - `src/chess_bot/config.py`: loads, validates, and creates profiles.
@@ -122,16 +128,19 @@ with each row ordered file a to h. Black square values are looked up through
 `simplified` set with all weights at 1. The tables remain static and have no
 opening/endgame interpolation.
 
-`[tournament]` supplies the default number of games, default seed, progress-bar
-width, and results log path. A seed of `-1` generates a fresh non-negative seed;
-the selected seed is displayed and logged for replay. Relative log paths resolve
-beside the selected `engine.toml`. The default `tournament-results.txt` is
-deliberately gitignored. Tournament colour alternation is currently mandatory.
-Competitors are tracked separately as Player 1 and Player 2, so they may use
-different profiles or the same profile while retaining unambiguous statistics.
-Adjacent colour-swapped games reuse each player's assigned random seed to reduce
-tie-breaking noise. Games run synchronously and headlessly: no board is rendered,
-but progress and elapsed time are redrawn after every game.
+`[tournament]` supplies the two-player default game count, round-robin defaults,
+default seed, progress-bar width, and results log path. A seed of `-1` generates
+a fresh non-negative seed; the selected seed is displayed and logged for replay.
+Relative log paths resolve beside the selected `engine.toml`. The default
+`tournament-results.txt` is deliberately gitignored. Tournament colour
+alternation is mandatory. The original tournament tracks Player 1 and Player 2
+separately, even when both use the same profile. A round robin accepts two to
+eight independently selected player slots. If its games-per-colour value is G,
+each pair plays 2G games and each entrant plays G games as White and G as Black
+against every opponent. Adjacent colour-swapped games reuse each player's
+assigned random seed to reduce tie-breaking noise. Games run synchronously and
+headlessly: no board is rendered, but progress and elapsed time are redrawn after
+every game.
 
 `[elo]` supplies the initial rating (1500 by default), K-factor (16), and local
 ratings JSON path. Ratings are keyed by stable profile ID rather than display

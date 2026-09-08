@@ -23,8 +23,10 @@ from chess_bot.game import InvalidMoveError, move_history, parse_move, result_te
 from chess_bot.ratings import EloRatings, RatingError
 from chess_bot.tournament import (
     ResultBreakdown,
+    RoundRobinTournamentResult,
     TournamentResult,
     append_tournament_report,
+    run_round_robin_tournament,
     run_tournament,
 )
 
@@ -154,6 +156,45 @@ def prompt_bot_profile(
 def prompt_tournament_game_count(default: int) -> int | None:
     while True:
         answer = input(f"Number of games [{default}], or Q to cancel › ").strip().lower()
+        if answer in {"q", "quit", "cancel"}:
+            return None
+        if answer == "":
+            return default
+        try:
+            games = int(answer)
+        except ValueError:
+            print("Enter a positive whole number.")
+            continue
+        if games > 0:
+            return games
+        print("Enter a positive whole number.")
+
+
+def prompt_round_robin_player_count(default: int) -> int | None:
+    while True:
+        answer = input(
+            f"Number of players, 2–8 [{default}], or Q to cancel › "
+        ).strip().lower()
+        if answer in {"q", "quit", "cancel"}:
+            return None
+        if answer == "":
+            return default
+        try:
+            players = int(answer)
+        except ValueError:
+            print("Enter a whole number from 2 to 8.")
+            continue
+        if 2 <= players <= 8:
+            return players
+        print("Enter a whole number from 2 to 8.")
+
+
+def prompt_round_robin_games_per_colour(default: int) -> int | None:
+    while True:
+        answer = input(
+            "Games each player plays as White and as Black against every "
+            f"opponent [{default}], or Q to cancel › "
+        ).strip().lower()
         if answer in {"q", "quit", "cancel"}:
             return None
         if answer == "":
@@ -303,6 +344,118 @@ def format_tournament_progress(
     return "\n".join(lines)
 
 
+def format_round_robin_progress(
+    result: RoundRobinTournamentResult,
+    progress_bar_width: int,
+    *,
+    final: bool = False,
+) -> str:
+    """Build a compact standings screen for a multi-player tournament."""
+    completed = result.games_completed
+    requested = result.games_requested
+    proportion = completed / requested
+    filled = min(progress_bar_width, int(proportion * progress_bar_width))
+    bar = "█" * filled + "░" * (progress_bar_width - filled)
+    heading = "ROUND-ROBIN COMPLETE" if final else "ROUND-ROBIN TOURNAMENT"
+    timing_label = "Duration" if final else "Elapsed"
+    speed = (
+        f" · {result.games_per_second:.2f} games/s"
+        if result.games_completed
+        else ""
+    )
+    player_count = len(result.profiles)
+    games_per_player = 2 * result.games_per_colour * (player_count - 1)
+    lines = [
+        f"━━━ {heading} ━━━",
+        (
+            f"Progress  [{bar}]  {completed}/{requested} "
+            f"({proportion * 100:5.1f}%)"
+        ),
+        (
+            f"{timing_label}  {_format_elapsed_time(result.elapsed_seconds)}"
+            f"{speed} · Seed {result.seed}"
+        ),
+        "",
+        "Round-robin format",
+        (
+            f"  {player_count} players · {result.games_per_colour} as White + "
+            f"{result.games_per_colour} as Black against every opponent"
+        ),
+        (
+            f"  {2 * result.games_per_colour} games per pairing · "
+            f"{games_per_player} games per player · {requested} games total"
+        ),
+    ]
+    if result.elo is not None:
+        lines.append(
+            f"  Elo: rated between different profiles · K={result.elo.k_factor}; "
+            "same-profile games are unrated"
+        )
+    lines.extend(["", "┌─ STANDINGS"])
+
+    ordered_players = sorted(
+        enumerate(result.profile_stats),
+        key=lambda item: (
+            -item[1].overall.score_fraction,
+            -item[1].overall.wins,
+            item[0],
+        ),
+    )
+    for place, (player_index, stats) in enumerate(ordered_players, start=1):
+        player_number = player_index + 1
+        lines.append(
+            f"│ {place:>2}. Player {player_number} · {stats.profile.name}  "
+            f"[{stats.profile.id}]"
+        )
+        if final:
+            lines.append(f"│     {_profile_strategy_text(stats.profile)}")
+        elo_line = _round_robin_profile_elo_line(result, player_index)
+        if elo_line is not None:
+            lines.append(elo_line)
+        lines.extend(
+            [
+                _format_result_line("Overall", stats.overall),
+                _format_result_line("♙ White", stats.as_white),
+                _format_result_line("♟ Black", stats.as_black),
+                "│",
+            ]
+        )
+    lines[-1] = "└" + "─" * 70
+
+    if final:
+        lines.extend(
+            [
+                "",
+                "┌─ TOURNAMENT TOTALS",
+                (
+                    f"│ White wins  {result.white_wins} "
+                    f"({_percentage(result.white_wins, completed):.1f}%) | "
+                    f"Black wins  {result.black_wins} "
+                    f"({_percentage(result.black_wins, completed):.1f}%) | "
+                    f"Draws  {result.draws} "
+                    f"({_percentage(result.draws, completed):.1f}%)"
+                ),
+                f"│ Average length  {result.average_plies:.1f} half-moves",
+                f"│ Duration  {_format_elapsed_time(result.elapsed_seconds)}",
+                f"│ Tournament seed  {result.seed}",
+            ]
+        )
+        if result.terminations:
+            endings = ", ".join(
+                f"{name}: {count}"
+                for name, count in sorted(result.terminations.items())
+            )
+            lines.append(f"│ Endings  {endings}")
+        if result.elo is not None:
+            lines.append(
+                f"│ Elo  {result.elo.rated_games} rated games · "
+                f"{result.elo.unrated_same_profile_games} same-profile games unrated"
+            )
+        lines.append("└" + "─" * 70)
+
+    return "\n".join(lines)
+
+
 def _format_result_line(label: str, results: ResultBreakdown) -> str:
     return (
         f"│   {label:<8} {results.games:>3} GP  │ "
@@ -351,6 +504,19 @@ def _profile_elo_line(
     return f"│   Elo {current:.1f}  ({delta:+.1f} this tournament)"
 
 
+def _round_robin_profile_elo_line(
+    result: RoundRobinTournamentResult,
+    player_index: int,
+) -> str | None:
+    if result.elo is None:
+        return None
+    profile_id = result.profiles[player_index].id
+    before = result.elo.before_by_profile[profile_id]
+    current = result.elo.current_by_profile[profile_id]
+    delta = current - before
+    return f"│     Elo {current:.1f}  ({delta:+.1f} this tournament)"
+
+
 def _performance_summary_lines(result: TournamentResult) -> list[str]:
     stats = result.profile_stats[0].overall
     if not stats.games:
@@ -395,6 +561,24 @@ def display_tournament_progress(
     print()
     print(
         format_tournament_progress(
+            result,
+            progress_bar_width,
+            final=final,
+        )
+    )
+
+
+def display_round_robin_progress(
+    result: RoundRobinTournamentResult,
+    progress_bar_width: int,
+    *,
+    final: bool = False,
+) -> None:
+    clear_screen()
+    print(TITLE)
+    print()
+    print(
+        format_round_robin_progress(
             result,
             progress_bar_width,
             final=final,
@@ -462,6 +646,89 @@ def run_bot_tournament_interactively(
     else:
         save_messages.append("Elo unchanged because same-profile self-play is unrated")
     display_tournament_progress(
+        result,
+        config.tournament_progress_bar_width,
+        final=True,
+    )
+    for message in save_messages:
+        print(f"\n✎ {message}")
+    input("\nPress Enter to return to the menu…")
+
+
+def run_round_robin_tournament_interactively(
+    config: EngineConfig,
+    ratings: EloRatings,
+) -> None:
+    clear_screen()
+    print(TITLE)
+    print("\nRound-robin tournament setup")
+    player_count = prompt_round_robin_player_count(
+        config.round_robin_default_players
+    )
+    if player_count is None:
+        return
+
+    profiles: list[BotProfile] = []
+    for player_number in range(1, player_count + 1):
+        profile = prompt_bot_profile(
+            config,
+            f"Choose Player {player_number}'s profile",
+            ratings,
+        )
+        if profile is None:
+            return
+        profiles.append(profile)
+
+    games_per_colour = prompt_round_robin_games_per_colour(
+        config.round_robin_games_per_colour
+    )
+    if games_per_colour is None:
+        return
+    continue_setup, seed = prompt_tournament_seed(config.tournament_default_seed)
+    if not continue_setup:
+        return
+
+    total_games = games_per_colour * player_count * (player_count - 1)
+    games_per_player = 2 * games_per_colour * (player_count - 1)
+    print(
+        f"\nThis will run {total_games} games. Each player plays "
+        f"{games_per_player} games: {games_per_colour} as White and "
+        f"{games_per_colour} as Black against each opponent."
+    )
+    start = input("Start tournament? [Y/n] › ").strip().lower()
+    if start in {"n", "no", "q", "quit", "cancel"}:
+        return
+
+    result = run_round_robin_tournament(
+        config,
+        [profile.id for profile in profiles],
+        games_per_colour,
+        ratings=ratings,
+        seed=seed,
+        progress_callback=lambda progress: display_round_robin_progress(
+            progress,
+            config.tournament_progress_bar_width,
+        ),
+    )
+    final_report = format_round_robin_progress(
+        result,
+        config.tournament_progress_bar_width,
+        final=True,
+    )
+    save_messages = [f"Results appended to {config.tournament_results_file}"]
+    try:
+        append_tournament_report(config.tournament_results_file, final_report)
+    except OSError as error:
+        save_messages[0] = f"Could not save results: {error}"
+    if result.elo is not None and result.elo.rated_games:
+        try:
+            ratings.save()
+            save_messages.append(f"Elo ratings saved to {ratings.path}")
+        except OSError as error:
+            save_messages.append(f"Could not save Elo ratings: {error}")
+    else:
+        save_messages.append("Elo unchanged because every game was same-profile")
+    display_round_robin_progress(
         result,
         config.tournament_progress_bar_width,
         final=True,
@@ -768,8 +1035,9 @@ def main() -> None:
         print("1. Play against a bot")
         print("2. Watch bot vs bot")
         print("3. Create a material/positional bot profile")
-        print("4. Run a bot tournament")
-        print("5. Quit")
+        print("4. Run a two-player bot tournament")
+        print("5. Run a round-robin tournament (2–8 players)")
+        print("6. Quit")
         choice = input("\nChoose an option › ").strip().lower()
 
         try:
@@ -812,7 +1080,9 @@ def main() -> None:
                     input("Press Enter to return to the menu…")
             elif choice in {"4", "tournament", "t"}:
                 run_bot_tournament_interactively(config, ratings)
-            elif choice in {"5", "quit", "q", "exit"}:
+            elif choice in {"5", "round-robin", "round robin", "rr"}:
+                run_round_robin_tournament_interactively(config, ratings)
+            elif choice in {"6", "quit", "q", "exit"}:
                 print("Thanks for playing!")
                 return
         except (KeyboardInterrupt, EOFError):

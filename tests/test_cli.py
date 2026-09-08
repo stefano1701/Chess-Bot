@@ -15,6 +15,8 @@ from chess_bot.cli import (
     create_material_profile_interactively,
     profile_summary,
     prompt_bot_profile,
+    prompt_round_robin_games_per_colour,
+    prompt_round_robin_player_count,
     prompt_tournament_game_count,
     prompt_tournament_seed,
 )
@@ -113,6 +115,24 @@ class ProfileMenuTests(unittest.TestCase):
 
         self.assertTrue(should_continue)
         self.assertEqual(seed, 42)
+
+    def test_round_robin_player_count_is_limited_to_two_through_eight(self) -> None:
+        with (
+            patch("builtins.input", side_effect=["one", "1", "9", "8"]),
+            redirect_stdout(StringIO()),
+        ):
+            players = prompt_round_robin_player_count(4)
+
+        self.assertEqual(players, 8)
+
+    def test_round_robin_games_per_colour_must_be_positive(self) -> None:
+        with (
+            patch("builtins.input", side_effect=["none", "0", "3"]),
+            redirect_stdout(StringIO()),
+        ):
+            games = prompt_round_robin_games_per_colour(1)
+
+        self.assertEqual(games, 3)
 
     def test_blank_tournament_seed_can_request_a_random_seed(self) -> None:
         with patch("builtins.input", return_value=""):

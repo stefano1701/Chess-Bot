@@ -6,7 +6,7 @@ import unittest
 
 import chess
 
-from chess_bot.cli import format_tournament_progress
+from chess_bot.cli import format_round_robin_progress, format_tournament_progress
 from chess_bot.config import load_engine_config
 from chess_bot.ratings import EloRatings
 from chess_bot.tournament import (
@@ -14,6 +14,7 @@ from chess_bot.tournament import (
     ResultBreakdown,
     TournamentResult,
     append_tournament_report,
+    run_round_robin_tournament,
     run_tournament,
 )
 
@@ -269,6 +270,146 @@ class TournamentTests(unittest.TestCase):
         self.assertTrue(result.elo.self_play)
         self.assertEqual(result.elo.rated_games, 0)
         self.assertEqual(ratings.games_for("standard-material"), 0)
+
+    def test_round_robin_gives_every_pair_equal_games_in_each_colour(self) -> None:
+        profile_ids = [
+            "standard-material",
+            "equal-minors",
+            "random",
+            "two-ply-material",
+        ]
+        oriented_pairings: list[tuple[str, str]] = []
+        progress_counts: list[int] = []
+
+        def record_pairing(white, black) -> CompletedGame:
+            oriented_pairings.append((white.name, black.name))
+            return CompletedGame(None, "stalemate", 12)
+
+        result = run_round_robin_tournament(
+            self.config,
+            profile_ids,
+            2,
+            seed=42,
+            game_runner=record_pairing,
+            progress_callback=lambda progress: progress_counts.append(
+                progress.games_completed
+            ),
+        )
+
+        self.assertEqual(result.games_requested, 24)
+        self.assertEqual(result.games_completed, 24)
+        self.assertEqual(progress_counts, list(range(25)))
+        for stats in result.profile_stats:
+            self.assertEqual(stats.overall.games, 12)
+            self.assertEqual(stats.overall.draws, 12)
+            self.assertEqual(stats.as_white.games, 6)
+            self.assertEqual(stats.as_black.games, 6)
+
+        for first_player in range(1, 5):
+            for second_player in range(1, 5):
+                if first_player == second_player:
+                    continue
+                matching_games = sum(
+                    white.startswith(f"Player {first_player} ·")
+                    and black.startswith(f"Player {second_player} ·")
+                    for white, black in oriented_pairings
+                )
+                self.assertEqual(matching_games, 2)
+
+    def test_round_robin_seed_replays_and_pairs_colour_swapped_randomness(self) -> None:
+        def observed_games(seed: int) -> list[tuple[str, str, chess.Move, chess.Move]]:
+            observations: list[tuple[str, str, chess.Move, chess.Move]] = []
+
+            def record_first_moves(white, black) -> CompletedGame:
+                board = chess.Board()
+                observations.append(
+                    (
+                        white.name,
+                        black.name,
+                        white.choose_move(board),
+                        black.choose_move(board),
+                    )
+                )
+                return CompletedGame(None, "stalemate", 1)
+
+            run_round_robin_tournament(
+                self.config,
+                ["random", "random", "random"],
+                1,
+                seed=seed,
+                game_runner=record_first_moves,
+            )
+            return observations
+
+        first_run = observed_games(8675309)
+        replay = observed_games(8675309)
+
+        self.assertEqual(first_run, replay)
+        for first_game, return_game in zip(
+            first_run[::2], first_run[1::2], strict=True
+        ):
+            self.assertEqual(first_game[0], return_game[1])
+            self.assertEqual(first_game[1], return_game[0])
+            self.assertEqual(first_game[2], return_game[3])
+            self.assertEqual(first_game[3], return_game[2])
+
+    def test_round_robin_rates_distinct_profiles_and_not_same_profile_games(self) -> None:
+        temporary_directory = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary_directory.cleanup)
+        ratings = EloRatings(Path(temporary_directory.name) / "ratings.json")
+
+        result = run_round_robin_tournament(
+            self.config,
+            ["standard-material", "standard-material", "equal-minors"],
+            1,
+            ratings=ratings,
+            game_runner=lambda _white, _black: CompletedGame(
+                chess.WHITE, "checkmate", 20
+            ),
+        )
+
+        self.assertIsNotNone(result.elo)
+        self.assertEqual(result.elo.rated_games, 4)
+        self.assertEqual(result.elo.unrated_same_profile_games, 2)
+        self.assertEqual(ratings.games_for("standard-material"), 4)
+        self.assertEqual(ratings.games_for("equal-minors"), 4)
+
+    def test_round_robin_report_contains_standings_and_colour_splits(self) -> None:
+        result = run_round_robin_tournament(
+            self.config,
+            ["standard-material", "equal-minors", "random"],
+            1,
+            seed=12345,
+            game_runner=lambda _white, _black: CompletedGame(
+                chess.WHITE, "checkmate", 20
+            ),
+        )
+
+        output = format_round_robin_progress(result, 10, final=True)
+
+        self.assertIn("ROUND-ROBIN COMPLETE", output)
+        self.assertIn("Progress  [██████████]  6/6 (100.0%)", output)
+        self.assertIn("1 as White + 1 as Black against every opponent", output)
+        self.assertIn("2 games per pairing · 4 games per player", output)
+        self.assertIn("Player 1 · Standard Material", output)
+        self.assertIn("♙ White", output)
+        self.assertIn("♟ Black", output)
+        self.assertIn("Tournament seed  12345", output)
+
+    def test_round_robin_rejects_invalid_player_and_game_counts(self) -> None:
+        with self.assertRaisesRegex(ValueError, "2 to 8 players"):
+            run_round_robin_tournament(self.config, ["random"], 1)
+        with self.assertRaisesRegex(ValueError, "2 to 8 players"):
+            run_round_robin_tournament(self.config, ["random"] * 9, 1)
+        with self.assertRaisesRegex(ValueError, "Games per colour must be positive"):
+            run_round_robin_tournament(self.config, ["random", "random"], 0)
+        with self.assertRaisesRegex(ValueError, "seed must be non-negative"):
+            run_round_robin_tournament(
+                self.config,
+                ["random", "random"],
+                1,
+                seed=-1,
+            )
 
 
 if __name__ == "__main__":

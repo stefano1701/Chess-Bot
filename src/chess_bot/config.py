@@ -140,6 +140,8 @@ class EngineConfig:
     tournament_default_seed: int | None
     tournament_progress_bar_width: int
     tournament_results_file: Path
+    round_robin_default_players: int
+    round_robin_games_per_colour: int
     profiles: dict[str, BotProfile]
     settings: dict[str, Any]
 
@@ -316,6 +318,20 @@ def load_engine_config(path: str | Path | None = None) -> EngineConfig:
     tournament_results_file = (
         selected_path.parent / tournament_results_file_name
     ).resolve()
+    round_robin_default_players = _positive_integer(
+        tournament,
+        "round_robin_default_players",
+        "tournament.round_robin_default_players",
+        default=4,
+    )
+    if not 2 <= round_robin_default_players <= 8:
+        raise ConfigError("tournament.round_robin_default_players must be 2 to 8.")
+    round_robin_games_per_colour = _positive_integer(
+        tournament,
+        "round_robin_games_per_colour",
+        "tournament.round_robin_games_per_colour",
+        default=1,
+    )
     if tournament.get("alternate_colors") is not True:
         raise ConfigError("tournament.alternate_colors must be true.")
     profiles = _load_profiles(
@@ -355,6 +371,8 @@ def load_engine_config(path: str | Path | None = None) -> EngineConfig:
         tournament_default_seed=tournament_default_seed,
         tournament_progress_bar_width=tournament_progress_bar_width,
         tournament_results_file=tournament_results_file,
+        round_robin_default_players=round_robin_default_players,
+        round_robin_games_per_colour=round_robin_games_per_colour,
         profiles=profiles,
         settings=settings,
     )

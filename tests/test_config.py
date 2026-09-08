@@ -49,6 +49,8 @@ class ProfileConfigTests(unittest.TestCase):
         self.assertEqual(config.tournament_default_games, 20)
         self.assertEqual(config.tournament_progress_bar_width, 32)
         self.assertEqual(config.tournament_results_file.name, "tournament-results.txt")
+        self.assertEqual(config.round_robin_default_players, 4)
+        self.assertEqual(config.round_robin_games_per_colour, 1)
 
     def test_equal_minor_profile_overrides_standard_values(self) -> None:
         config = load_engine_config()
@@ -67,6 +69,7 @@ class ProfileConfigTests(unittest.TestCase):
     def test_historical_depth_two_profiles_match_published_point_values(self) -> None:
         config = load_engine_config()
         expected_values = {
+            "2-ply-coxeter-1940": (100, 300, 350, 550, 1000),
             "2-ply-euwe-kramer-1944": (100, 350, 350, 550, 1000),
             "2-ply-shannon-1949": (100, 300, 300, 500, 900),
             "2-ply-turing-1953": (100, 300, 350, 500, 1000),

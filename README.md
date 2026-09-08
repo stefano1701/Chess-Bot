@@ -11,6 +11,8 @@ An optional piece-square evaluation adds a first layer of positional knowledge.
 - Watch two independently selected profiles play each other
 - Run headless multi-game tournaments with alternating colours, a live progress
   bar, elapsed timer, replayable seed, and overall/White/Black statistics
+- Run round-robin tournaments for two to eight player slots, with a configurable
+  number of games in each colour against every opponent
 - Maintain persistent Elo ratings and lifetime results for bot profiles
 - Create material/positional profiles with a chosen search depth and positional
   weight from the terminal menu
@@ -61,7 +63,7 @@ default_profile = "two-ply-material"
 profiles_directory = "profiles"
 ```
 
-Fifteen profiles are bundled:
+Sixteen profiles are bundled:
 
 - **Random Bot:** chooses any legal move uniformly.
 - **Standard Material:** one ply; `P=100, N=320, B=330, R=500, Q=900`.
@@ -70,12 +72,13 @@ Fifteen profiles are bundled:
 - **Two-Ply Positional:** minimax depth 2; standard material plus piece-square
   tables at weight 1.
 
-Ten additional material-only, depth-2 profiles reproduce every complete value
-set in the Chess Programming Wiki's
+Eleven additional material-only, depth-2 profiles reproduce the historical value
+sets in the Chess Programming Wiki's
 [Point Value table](https://chessprogramming.org/Point_Value):
 
 | Profile | Pawn | Knight | Bishop | Rook | Queen |
 | --- | ---: | ---: | ---: | ---: | ---: |
+| 2 ply Coxeter 1940¹ | 100 | 300 | 350 | 550 | 1000 |
 | 2 ply Euwe & Kramer 1944 | 100 | 350 | 350 | 550 | 1000 |
 | 2 ply Shannon 1949 | 100 | 300 | 300 | 500 | 900 |
 | 2 ply Turing 1953 | 100 | 300 | 350 | 500 | 1000 |
@@ -87,8 +90,8 @@ set in the Chess Programming Wiki's
 | 2 ply Fruit et al 2005 | 100 | 400 | 400 | 600 | 1200 |
 | 2 ply Kaufman 2012 | 100 | 350 | 350 | 525 | 1000 |
 
-Coxeter's 1940 row is not included because the source table gives no pawn value,
-so it cannot define a complete material profile without an additional assumption.
+¹ Coxeter's source row does not specify a pawn value. This profile uses the
+requested assumption `P=100` and preserves the four listed piece values.
 
 The one-ply bots inspect every legal move and select the best immediate material
 score. The minimax bot also inspects every legal opponent reply, assumes the
@@ -165,12 +168,27 @@ saved so the tournament can be replayed later with the same code and profile
 settings. Adjacent games are paired: each player receives the same random
 tie-breaking stream when the colours swap.
 
+Choose **Run a round-robin tournament** to enter between two and eight player
+slots. A profile is selected independently for each slot, and the same profile
+may occupy more than one slot. The game-count setting means games *per colour per
+pairing*: if it is 3, every pair plays six games—three with each player as White.
+For `P` players and `G` games per colour, the tournament contains
+`G × P × (P - 1)` games, and each player receives exactly
+`G × (P - 1)` games as White and the same number as Black. The setup shows the
+calculated total and asks for confirmation before starting.
+
 Tournament boards are not drawn. The terminal instead shows a live progress bar,
 elapsed time, games per second, and a panel for each player containing wins,
 draws, losses, win percentage, and chess score percentage, both overall and split
 by colour. The final report also shows total duration, White/Black results,
 average game length, how games ended, and the tournament seed. With an odd game
 count, Player 1 receives one extra game as White.
+
+The live round-robin screen ranks all entrants by score and shows their overall,
+White, and Black records. Its final report includes the player configurations,
+duration, seed, endings, and rated/unrated game counts. Games between different
+profile IDs update Elo; games between two slots using the same profile ID remain
+unrated.
 
 Every completed report is timestamped and appended to
 `tournament-results.txt` in the project directory. The file is ignored by Git so
@@ -207,9 +225,9 @@ tie-breaking choices while a non-negative integer makes them repeatable.
 Tournaments override profile seeds with their displayed tournament seed. The
 remaining global sections scaffold positional evaluation, deeper search, tactics,
 time management, online play, and diagnostics. The `[tournament]` section controls
-the default game count, seed, progress-bar width, and results-file location;
-colour alternation is required. A default seed of `-1` means generate and report
-a fresh replayable seed for every tournament.
+the default game counts, round-robin player count, seed, progress-bar width, and
+results-file location; colour alternation is required. A default seed of `-1`
+means generate and report a fresh replayable seed for every tournament.
 
 Set the `CHESS_BOT_CONFIG` environment variable to experiment with a separate
 configuration without editing the default file.
