@@ -1,0 +1,19 @@
+[profile]
+name = "2 ply Berliner 1999"
+strategy = "minimax"
+description = "Depth-2 material profile using Hans Berliner's 1999 point values."
+random_seed = -1
+
+[search]
+depth = 2
+
+[evaluation]
+piece_square_tables = 0.0
+
+[material]
+pawn = 100
+knight = 320
+bishop = 333
+rook = 510
+queen = 880
+king = 0

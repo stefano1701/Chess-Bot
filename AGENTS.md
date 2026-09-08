@@ -15,7 +15,7 @@ to a mature engine or hide the interesting decisions behind an external engine.
 
 ## Current milestone
 
-Version: 0.12.0
+Version: 0.12.1
 
 Three strategies are implemented: `random`, `one_ply`, and `minimax`. The one-ply
 strategy chooses the best immediate material result. Minimax searches to the
@@ -57,8 +57,9 @@ The terminal application currently supports:
 - `engine.toml`: the single source of truth for engine behavior and future
   shared tuning values. Read it before doing engine work.
 - `profiles/*.toml`: bot names, strategies, seeds, and optional material-value
-  overrides, search depth, table set, and positional weights. One-ply and two-ply
-  examples are included.
+  overrides, search depth, table set, and positional weights. Bundled examples
+  include ten material-only depth-2 profiles drawn from the complete historical
+  value sets in the Chess Programming Wiki Point Value table.
 - `piece-square-tables/*.toml`: named positional table sets. Every file contains
   all 384 editable square values and appears in the profile-creation chooser.
 - `src/chess_bot/config.py`: loads, validates, and creates profiles.

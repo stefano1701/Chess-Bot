@@ -1,0 +1,19 @@
+[profile]
+name = "2 ply Kaufman 1999"
+strategy = "minimax"
+description = "Depth-2 material profile using Larry Kaufman's 1999 point values."
+random_seed = -1
+
+[search]
+depth = 2
+
+[evaluation]
+piece_square_tables = 0.0
+
+[material]
+pawn = 100
+knight = 325
+bishop = 325
+rook = 500
+queen = 975
+king = 0

@@ -1,0 +1,19 @@
+[profile]
+name = "2 ply Fruit et al 2005"
+strategy = "minimax"
+description = "Depth-2 material profile using the Fruit and related engines' 2005 point values."
+random_seed = -1
+
+[search]
+depth = 2
+
+[evaluation]
+piece_square_tables = 0.0
+
+[material]
+pawn = 100
+knight = 400
+bishop = 400
+rook = 600
+queen = 1200
+king = 0

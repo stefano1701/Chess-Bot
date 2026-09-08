@@ -1,0 +1,19 @@
+[profile]
+name = "2 ply Mac Hack 1967"
+strategy = "minimax"
+description = "Depth-2 material profile using the Mac Hack program's 1967 point values."
+random_seed = -1
+
+[search]
+depth = 2
+
+[evaluation]
+piece_square_tables = 0.0
+
+[material]
+pawn = 100
+knight = 325
+bishop = 350
+rook = 500
+queen = 975
+king = 0

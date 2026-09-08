@@ -61,7 +61,7 @@ default_profile = "two-ply-material"
 profiles_directory = "profiles"
 ```
 
-Five profiles are included:
+Fifteen profiles are bundled:
 
 - **Random Bot:** chooses any legal move uniformly.
 - **Standard Material:** one ply; `P=100, N=320, B=330, R=500, Q=900`.
@@ -69,6 +69,26 @@ Five profiles are included:
 - **Two-Ply Material:** minimax depth 2; standard material values.
 - **Two-Ply Positional:** minimax depth 2; standard material plus piece-square
   tables at weight 1.
+
+Ten additional material-only, depth-2 profiles reproduce every complete value
+set in the Chess Programming Wiki's
+[Point Value table](https://chessprogramming.org/Point_Value):
+
+| Profile | Pawn | Knight | Bishop | Rook | Queen |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 2 ply Euwe & Kramer 1944 | 100 | 350 | 350 | 550 | 1000 |
+| 2 ply Shannon 1949 | 100 | 300 | 300 | 500 | 900 |
+| 2 ply Turing 1953 | 100 | 300 | 350 | 500 | 1000 |
+| 2 ply Mac Hack 1967 | 100 | 325 | 350 | 500 | 975 |
+| 2 ply Chess 4.5 1977 | 100 | 325 | 350 | 500 | 900 |
+| 2 ply Michniewski 1995 | 100 | 320 | 330 | 500 | 900 |
+| 2 ply Berliner 1999 | 100 | 320 | 333 | 510 | 880 |
+| 2 ply Kaufman 1999 | 100 | 325 | 325 | 500 | 975 |
+| 2 ply Fruit et al 2005 | 100 | 400 | 400 | 600 | 1200 |
+| 2 ply Kaufman 2012 | 100 | 350 | 350 | 525 | 1000 |
+
+Coxeter's 1940 row is not included because the source table gives no pawn value,
+so it cannot define a complete material profile without an additional assumption.
 
 The one-ply bots inspect every legal move and select the best immediate material
 score. The minimax bot also inspects every legal opponent reply, assumes the

@@ -1,0 +1,19 @@
+[profile]
+name = "2 ply Michniewski 1995"
+strategy = "minimax"
+description = "Depth-2 material profile using Tomasz Michniewski's 1995 point values."
+random_seed = -1
+
+[search]
+depth = 2
+
+[evaluation]
+piece_square_tables = 0.0
+
+[material]
+pawn = 100
+knight = 320
+bishop = 330
+rook = 500
+queen = 900
+king = 0

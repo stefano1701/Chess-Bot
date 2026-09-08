@@ -64,6 +64,40 @@ class ProfileConfigTests(unittest.TestCase):
         self.assertEqual(standard_bot.evaluator.values, standard)
         self.assertEqual(equal_minors_bot.evaluator.values, equal_minors)
 
+    def test_historical_depth_two_profiles_match_published_point_values(self) -> None:
+        config = load_engine_config()
+        expected_values = {
+            "2-ply-euwe-kramer-1944": (100, 350, 350, 550, 1000),
+            "2-ply-shannon-1949": (100, 300, 300, 500, 900),
+            "2-ply-turing-1953": (100, 300, 350, 500, 1000),
+            "2-ply-mac-hack-1967": (100, 325, 350, 500, 975),
+            "2-ply-chess-4-5-1977": (100, 325, 350, 500, 900),
+            "2-ply-michniewski-1995": (100, 320, 330, 500, 900),
+            "2-ply-berliner-1999": (100, 320, 333, 510, 880),
+            "2-ply-kaufman-1999": (100, 325, 325, 500, 975),
+            "2-ply-fruit-et-al-2005": (100, 400, 400, 600, 1200),
+            "2-ply-kaufman-2012": (100, 350, 350, 525, 1000),
+        }
+
+        for profile_id, expected in expected_values.items():
+            with self.subTest(profile_id=profile_id):
+                profile = config.get_profile(profile_id)
+                material = profile.material
+                self.assertEqual(profile.strategy, "minimax")
+                self.assertEqual(profile.search_depth, 2)
+                self.assertEqual(profile.piece_square_weight, 0.0)
+                self.assertEqual(
+                    (
+                        material.pawn,
+                        material.knight,
+                        material.bishop,
+                        material.rook,
+                        material.queen,
+                    ),
+                    expected,
+                )
+                self.assertEqual(material.king, 0)
+
     def test_piece_square_evaluation_is_available_but_off_by_default(self) -> None:
         config = load_engine_config()
 

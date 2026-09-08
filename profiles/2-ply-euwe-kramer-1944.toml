@@ -1,0 +1,19 @@
+[profile]
+name = "2 ply Euwe & Kramer 1944"
+strategy = "minimax"
+description = "Depth-2 material profile using Euwe and Kramer's 1944 point values."
+random_seed = -1
+
+[search]
+depth = 2
+
+[evaluation]
+piece_square_tables = 0.0
+
+[material]
+pawn = 100
+knight = 350
+bishop = 350
+rook = 550
+queen = 1000
+king = 0

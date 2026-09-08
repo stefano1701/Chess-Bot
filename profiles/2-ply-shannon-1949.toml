@@ -1,0 +1,19 @@
+[profile]
+name = "2 ply Shannon 1949"
+strategy = "minimax"
+description = "Depth-2 material profile using Claude Shannon's 1949 point values."
+random_seed = -1
+
+[search]
+depth = 2
+
+[evaluation]
+piece_square_tables = 0.0
+
+[material]
+pawn = 100
+knight = 300
+bishop = 300
+rook = 500
+queen = 900
+king = 0
