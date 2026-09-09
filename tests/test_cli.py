@@ -116,14 +116,14 @@ class ProfileMenuTests(unittest.TestCase):
         self.assertTrue(should_continue)
         self.assertEqual(seed, 42)
 
-    def test_round_robin_player_count_is_limited_to_two_through_eight(self) -> None:
+    def test_round_robin_player_count_is_limited_to_two_through_twelve(self) -> None:
         with (
-            patch("builtins.input", side_effect=["one", "1", "9", "8"]),
+            patch("builtins.input", side_effect=["one", "1", "13", "12"]),
             redirect_stdout(StringIO()),
         ):
             players = prompt_round_robin_player_count(4)
 
-        self.assertEqual(players, 8)
+        self.assertEqual(players, 12)
 
     def test_round_robin_games_per_colour_must_be_positive(self) -> None:
         with (

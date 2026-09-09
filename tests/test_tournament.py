@@ -433,10 +433,10 @@ class TournamentTests(unittest.TestCase):
         self.assertEqual(result.head_to_head[2][1].score_percentage, 50.0)
 
     def test_round_robin_rejects_invalid_player_and_game_counts(self) -> None:
-        with self.assertRaisesRegex(ValueError, "2 to 8 players"):
+        with self.assertRaisesRegex(ValueError, "2 to 12 players"):
             run_round_robin_tournament(self.config, ["random"], 1)
-        with self.assertRaisesRegex(ValueError, "2 to 8 players"):
-            run_round_robin_tournament(self.config, ["random"] * 9, 1)
+        with self.assertRaisesRegex(ValueError, "2 to 12 players"):
+            run_round_robin_tournament(self.config, ["random"] * 13, 1)
         with self.assertRaisesRegex(ValueError, "Games per colour must be positive"):
             run_round_robin_tournament(self.config, ["random", "random"], 0)
         with self.assertRaisesRegex(ValueError, "seed must be non-negative"):
@@ -446,6 +446,28 @@ class TournamentTests(unittest.TestCase):
                 1,
                 seed=-1,
             )
+
+    def test_round_robin_supports_twelve_player_slots(self) -> None:
+        result = run_round_robin_tournament(
+            self.config,
+            ["random"] * 12,
+            1,
+            game_runner=lambda _white, _black: CompletedGame(
+                None,
+                "stalemate",
+                1,
+            ),
+        )
+
+        self.assertEqual(result.games_completed, 132)
+        self.assertEqual(len(result.profile_stats), 12)
+        self.assertTrue(
+            all(stats.overall.games == 22 for stats in result.profile_stats)
+        )
+        output = format_round_robin_progress(result, 10, final=True)
+        self.assertIn("Opponents P1–P8", output)
+        self.assertIn("Opponents P9–P12", output)
+        self.assertIn("P12 = Player 12 · Random Bot", output)
 
 
 if __name__ == "__main__":

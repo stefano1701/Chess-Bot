@@ -11,7 +11,7 @@ An optional piece-square evaluation adds a first layer of positional knowledge.
 - Watch two independently selected profiles play each other
 - Run headless multi-game tournaments with alternating colours, a live progress
   bar, elapsed timer, replayable seed, and overall/White/Black statistics
-- Run round-robin tournaments for two to eight player slots, with a configurable
+- Run round-robin tournaments for two to twelve player slots, with a configurable
   number of games in each colour and a final head-to-head score matrix
 - Maintain cumulative, order-independent batch Elo ratings and lifetime results
   for bot profiles
@@ -169,7 +169,7 @@ saved so the tournament can be replayed later with the same code and profile
 settings. Adjacent games are paired: each player receives the same random
 tie-breaking stream when the colours swap.
 
-Choose **Run a round-robin tournament** to enter between two and eight player
+Choose **Run a round-robin tournament** to enter between two and twelve player
 slots. A profile is selected independently for each slot, and the same profile
 may occupy more than one slot. The game-count setting means games *per colour per
 pairing*: if it is 3, every pair plays six games—three with each player as White.

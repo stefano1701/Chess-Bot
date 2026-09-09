@@ -173,7 +173,7 @@ def prompt_tournament_game_count(default: int) -> int | None:
 def prompt_round_robin_player_count(default: int) -> int | None:
     while True:
         answer = input(
-            f"Number of players, 2–8 [{default}], or Q to cancel › "
+            f"Number of players, 2–12 [{default}], or Q to cancel › "
         ).strip().lower()
         if answer in {"q", "quit", "cancel"}:
             return None
@@ -182,11 +182,11 @@ def prompt_round_robin_player_count(default: int) -> int | None:
         try:
             players = int(answer)
         except ValueError:
-            print("Enter a whole number from 2 to 8.")
+            print("Enter a whole number from 2 to 12.")
             continue
-        if 2 <= players <= 8:
+        if 2 <= players <= 12:
             return players
-        print("Enter a whole number from 2 to 8.")
+        print("Enter a whole number from 2 to 12.")
 
 
 def prompt_round_robin_games_per_colour(default: int) -> int | None:
@@ -479,17 +479,31 @@ def _format_head_to_head_matrix(
     lines = [
         "┌─ HEAD-TO-HEAD SCORE (%)",
         "│ Rows score against columns · draws count as half a point",
-        "│      " + " ".join(f"{label:>6}" for label in labels),
     ]
-    for row_index, label in enumerate(labels):
-        cells: list[str] = []
-        for column_index in range(player_count):
-            if row_index == column_index:
-                cells.append(f"{'—':>6}")
-            else:
-                score = result.head_to_head[row_index][column_index].score_percentage
-                cells.append(f"{score:>6.1f}")
-        lines.append(f"│ {label:<3}  " + " ".join(cells))
+    columns_per_block = 8
+    for first_column in range(0, player_count, columns_per_block):
+        column_indexes = range(
+            first_column,
+            min(first_column + columns_per_block, player_count),
+        )
+        block_labels = labels[first_column : first_column + columns_per_block]
+        if first_column:
+            lines.append("│")
+        lines.append(
+            f"│ Opponents {block_labels[0]}–{block_labels[-1]}"
+        )
+        lines.append("│      " + " ".join(f"{label:>6}" for label in block_labels))
+        for row_index, label in enumerate(labels):
+            cells: list[str] = []
+            for column_index in column_indexes:
+                if row_index == column_index:
+                    cells.append(f"{'—':>6}")
+                else:
+                    score = result.head_to_head[row_index][
+                        column_index
+                    ].score_percentage
+                    cells.append(f"{score:>6.1f}")
+            lines.append(f"│ {label:<3}  " + " ".join(cells))
     lines.extend(
         f"│ {label} = Player {index} · {profile.name}"
         for index, (label, profile) in enumerate(
@@ -1087,7 +1101,7 @@ def main() -> None:
         print("2. Watch bot vs bot")
         print("3. Create a material/positional bot profile")
         print("4. Run a two-player bot tournament")
-        print("5. Run a round-robin tournament (2–8 players)")
+        print("5. Run a round-robin tournament (2–12 players)")
         print("6. Quit")
         choice = input("\nChoose an option › ").strip().lower()
 

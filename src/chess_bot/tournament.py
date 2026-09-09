@@ -398,9 +398,9 @@ def run_round_robin_tournament(
     seed: int | None = None,
     clock: Clock = perf_counter,
 ) -> RoundRobinTournamentResult:
-    """Run a complete double round-robin for two to eight player slots."""
-    if not 2 <= len(profile_ids) <= 8:
-        raise ValueError("A round-robin tournament requires 2 to 8 players.")
+    """Run a complete double round-robin for two to twelve player slots."""
+    if not 2 <= len(profile_ids) <= 12:
+        raise ValueError("A round-robin tournament requires 2 to 12 players.")
     if games_per_colour <= 0:
         raise ValueError("Games per colour must be positive.")
     if seed is not None and (isinstance(seed, bool) or seed < 0):

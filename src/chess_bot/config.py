@@ -327,8 +327,8 @@ def load_engine_config(path: str | Path | None = None) -> EngineConfig:
         "tournament.round_robin_default_players",
         default=4,
     )
-    if not 2 <= round_robin_default_players <= 8:
-        raise ConfigError("tournament.round_robin_default_players must be 2 to 8.")
+    if not 2 <= round_robin_default_players <= 12:
+        raise ConfigError("tournament.round_robin_default_players must be 2 to 12.")
     round_robin_games_per_colour = _positive_integer(
         tournament,
         "round_robin_games_per_colour",

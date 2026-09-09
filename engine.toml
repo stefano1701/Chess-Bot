@@ -177,7 +177,7 @@ default_seed = -1            # -1 = generate and report a replayable seed.
 progress_bar_width = 32
 alternate_colors = true
 results_file = "tournament-results.txt"
-round_robin_default_players = 4    # Allowed range: 2 to 8 player slots.
+round_robin_default_players = 4    # Allowed range: 2 to 12 player slots.
 round_robin_games_per_colour = 1  # Per opponent; total = G × P × (P - 1).
 
 [online]

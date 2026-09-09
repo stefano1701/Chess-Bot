@@ -15,7 +15,7 @@ to a mature engine or hide the interesting decisions behind an external engine.
 
 ## Current milestone
 
-Version: 0.14.0
+Version: 0.14.1
 
 Three strategies are implemented: `random`, `one_ply`, and `minimax`. The one-ply
 strategy chooses the best immediate material result. Minimax searches to the
@@ -39,7 +39,7 @@ The terminal application currently supports:
   speed, an approximate score confidence interval, and tournament performance
   Elo. Completed reports are timestamped and appended to a configurable local
   text file.
-- Headless round-robin tournaments for two to eight player slots. Every pairing
+- Headless round-robin tournaments for two to twelve player slots. Every pairing
   plays a configurable number of games in each colour, giving every entrant an
   exactly balanced White/Black schedule. Player slots remain separate when a
   profile is selected more than once; games between the same profile ID are
@@ -137,7 +137,7 @@ Relative log paths resolve beside the selected `engine.toml`. The default
 `tournament-results.txt` is deliberately gitignored. Tournament colour
 alternation is mandatory. The original tournament tracks Player 1 and Player 2
 separately, even when both use the same profile. A round robin accepts two to
-eight independently selected player slots. If its games-per-colour value is G,
+twelve independently selected player slots. If its games-per-colour value is G,
 each pair plays 2G games and each entrant plays G games as White and G as Black
 against every opponent. Adjacent colour-swapped games reuse each player's
 assigned random seed to reduce tie-breaking noise. Games run synchronously and
