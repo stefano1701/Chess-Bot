@@ -12,8 +12,9 @@ An optional piece-square evaluation adds a first layer of positional knowledge.
 - Run headless multi-game tournaments with alternating colours, a live progress
   bar, elapsed timer, replayable seed, and overall/White/Black statistics
 - Run round-robin tournaments for two to eight player slots, with a configurable
-  number of games in each colour against every opponent
-- Maintain persistent Elo ratings and lifetime results for bot profiles
+  number of games in each colour and a final head-to-head score matrix
+- Maintain cumulative, order-independent batch Elo ratings and lifetime results
+  for bot profiles
 - Create material/positional profiles with a chosen search depth and positional
   weight from the terminal menu
 - See how many positions minimax examined after each move
@@ -186,9 +187,10 @@ count, Player 1 receives one extra game as White.
 
 The live round-robin screen ranks all entrants by score and shows their overall,
 White, and Black records. Its final report includes the player configurations,
-duration, seed, endings, and rated/unrated game counts. Games between different
-profile IDs update Elo; games between two slots using the same profile ID remain
-unrated.
+duration, seed, endings, rated/unrated game counts, and a head-to-head matrix.
+Each matrix row shows that player's percentage score against each column player,
+with a win worth one point and a draw worth half a point. Games between two slots
+using the same profile ID appear in the matrix but remain unrated.
 
 Every completed report is timestamped and appended to
 `tournament-results.txt` in the project directory. The file is ignored by Git so
@@ -197,12 +199,18 @@ local tournament history does not create repository changes. Change
 
 ## Elo ratings
 
-Every tournament game between two different profiles is rated immediately using
-the standard Elo expected-score formula. Profiles start at 1500 and use a
-K-factor of 16 by default. The profile chooser shows each bot's current Elo and
-number of rated games, while tournament reports show live ratings and the change
-for each player. This persistent Elo is updated sequentially, so it describes the
-profiles' accumulated history rather than only the latest match.
+Ratings use the standard Elo expected-score curve, but they are fitted as one
+batch after a tournament completes rather than updated after every game. The
+calculation uses all head-to-head results saved since batch ratings were
+introduced, so shuffling the game order cannot change the ratings. Profiles start
+at 1500. The profile chooser shows each bot's current batch Elo and lifetime
+number of rated games; completed tournament reports show the new rating and its
+change. Live tournament screens mark the rating update as pending.
+
+A configurable Gaussian prior prevents tiny or perfect match samples from
+producing infinite ratings. Its standard deviation defaults to 100 Elo: lower
+values pull sparse ratings more strongly toward 1500, while its effect becomes
+small once many games have been recorded. This replaces the old K-factor setting.
 
 The final report also gives Player 1's tournament performance as a score with an
 approximate 95% confidence interval, plus its performance Elo difference against
@@ -212,13 +220,15 @@ Player 1 performed that many Elo points above Player 2, and a negative value mea
 below. The confidence interval is an approximation and paired games are not fully
 independent, so use it as a guide rather than a proof that one profile is better.
 
-Ratings and lifetime W/D/L totals are stored by profile ID in
-`bot-ratings.json`. This local file is ignored by Git and is written atomically
-after a completed tournament. Existing tournament text logs are not applied
-retroactively, so all profiles begin at 1500 when this version is first run.
-Same-profile self-play is explicitly unrated: a rating identity cannot gain or
-lose Elo against itself. Configure the initial rating, K-factor, and file path in
-the `[elo]` section of `engine.toml`.
+Ratings, lifetime W/D/L totals, and cumulative profile-vs-profile results are
+stored by profile ID in `bot-ratings.json`. This local file is ignored by Git and
+is written atomically after a completed tournament. Version-1 rating files did
+not contain opponent-level results, so their order-sensitive ratings restart at
+1500 on upgrade while their lifetime W/D/L counts are preserved. Existing text
+reports cannot be applied retroactively. Same-profile self-play is explicitly
+unrated: a rating identity cannot gain or lose Elo against itself. Configure the
+initial rating, prior standard deviation, and file path in the `[elo]` section of
+`engine.toml`.
 
 Each profile also has a `random_seed`: outside tournaments, `-1` gives fresh
 tie-breaking choices while a non-negative integer makes them repeatable.

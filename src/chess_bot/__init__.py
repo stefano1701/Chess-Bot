@@ -1,3 +1,3 @@
 """A small chess bot designed for learning engine concepts."""
 
-__version__ = "0.13.0"
+__version__ = "0.14.0"

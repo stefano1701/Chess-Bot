@@ -15,7 +15,7 @@ to a mature engine or hide the interesting decisions behind an external engine.
 
 ## Current milestone
 
-Version: 0.13.0
+Version: 0.14.0
 
 Three strategies are implemented: `random`, `one_ply`, and `minimax`. The one-ply
 strategy chooses the best immediate material result. Minimax searches to the
@@ -43,13 +43,15 @@ The terminal application currently supports:
   plays a configurable number of games in each colour, giving every entrant an
   exactly balanced White/Black schedule. Player slots remain separate when a
   profile is selected more than once; games between the same profile ID are
-  unrated. Live and logged reports contain standings and colour splits.
+  unrated. Live and logged reports contain standings and colour splits; final
+  reports also contain a player-by-player percentage score matrix.
 - Interactive creation of material profiles with a configurable search depth.
 - A table-set chooser, overall piece-square weight, and six per-piece weights when
   creating profiles. Zero keeps the original material-only evaluator.
 - Per-move node counts for minimax in human and spectator games.
-- Persistent profile Elo ratings with K=16, updated game-by-game for tournaments
-  between different profiles. Same-profile self-play is explicitly unrated.
+- Persistent profile Elo ratings fitted in an order-independent batch from all
+  saved head-to-head results after each tournament. Same-profile self-play is
+  explicitly unrated.
 - SAN input such as `e4`, `Nf3`, `Qh5`, and `O-O`.
 - UCI coordinate input such as `e2e4`, `g1f3`, and `e7e8q`.
 - A Unicode board with white and shaded squares, rotated for a Black player.
@@ -79,8 +81,8 @@ The terminal application currently supports:
 - `src/chess_bot/display.py`: Unicode and terminal-colour board rendering.
 - `src/chess_bot/tournament.py`: headless game loop, alternating scheduling,
   result aggregation, profile/colour breakdowns, and Elo integration.
-- `src/chess_bot/ratings.py`: standard Elo calculations, lifetime profile
-  records, JSON validation, and atomic persistence.
+- `src/chess_bot/ratings.py`: regularized batch Elo fitting, cumulative matchup
+  and lifetime profile records, JSON migration/validation, and atomic persistence.
 - `src/chess_bot/cli.py`: menus, interactive game loops, and tournament report
   formatting; engine decisions do not belong here.
 - `scripts/mike-chess`: personal macOS Terminal launcher.
@@ -142,12 +144,17 @@ assigned random seed to reduce tie-breaking noise. Games run synchronously and
 headlessly: no board is rendered, but progress and elapsed time are redrawn after
 every game.
 
-`[elo]` supplies the initial rating (1500 by default), K-factor (16), and local
-ratings JSON path. Ratings are keyed by stable profile ID rather than display
-name. Different-profile tournament games update Elo sequentially in memory and
-the completed tournament saves `bot-ratings.json` atomically. This file is
-gitignored. Historical text reports are not backfilled. Same-profile self-play
-must remain unrated because both competitors share one rating identity.
+`[elo]` supplies the initial rating (1500 by default), batch prior standard
+deviation (100 Elo), and local ratings JSON path. Ratings are keyed by stable
+profile ID rather than display name. After a tournament, the standard Elo
+logistic model is fitted simultaneously to all cumulative profile-vs-profile
+results stored in `bot-ratings.json`; a Gaussian prior around the initial rating
+keeps sparse or perfect records finite. The fit is independent of game and
+pairing order. The JSON file is saved atomically and gitignored. Version-1 files
+preserve lifetime W/D/L totals but reset their unconvertible sequential ratings
+to the initial rating because they did not store opponent-level results.
+Historical text reports are not backfilled. Same-profile self-play must remain
+unrated because both competitors share one rating identity.
 
 Tournament performance Elo is separate from persistent Elo. It converts Player
 1's aggregate tournament score to an Elo difference against Player 2 and is never

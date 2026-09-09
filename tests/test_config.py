@@ -108,7 +108,7 @@ class ProfileConfigTests(unittest.TestCase):
         self.assertEqual(config.settings["search"]["max_depth"], 2)
         self.assertEqual(config.search_max_depth, 2)
         self.assertEqual(config.elo_initial_rating, 1500)
-        self.assertEqual(config.elo_k_factor, 16)
+        self.assertEqual(config.elo_prior_std_deviation, 100)
         self.assertEqual(config.elo_ratings_file.name, "bot-ratings.json")
         self.assertIsNone(config.tournament_default_seed)
         self.assertTrue(config.settings["evaluation"]["enabled"])

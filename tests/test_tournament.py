@@ -219,13 +219,13 @@ class TournamentTests(unittest.TestCase):
         self.assertEqual(player_one.as_white.wins, 1)
         self.assertEqual(player_two.as_white.wins, 1)
 
-    def test_different_profiles_update_elo_after_each_game(self) -> None:
+    def test_different_profiles_update_batch_elo_after_the_tournament(self) -> None:
         temporary_directory = tempfile.TemporaryDirectory()
         self.addCleanup(temporary_directory.cleanup)
         ratings = EloRatings(
             Path(temporary_directory.name) / "ratings.json",
             initial_rating=1500,
-            k_factor=32,
+            prior_std_deviation=100,
         )
         games = iter(
             [
@@ -245,11 +245,11 @@ class TournamentTests(unittest.TestCase):
 
         self.assertIsNotNone(result.elo)
         self.assertEqual(result.elo.rated_games, 2)
-        self.assertAlmostEqual(result.elo.first_current, 1530.5305, places=3)
-        self.assertAlmostEqual(result.elo.second_current, 1469.4695, places=3)
+        self.assertAlmostEqual(result.elo.first_current, 1543.4573, places=3)
+        self.assertAlmostEqual(result.elo.second_current, 1456.5427, places=3)
         self.assertEqual(ratings.games_for("standard-material"), 2)
         report = format_tournament_progress(result, 10, final=True)
-        self.assertIn("Elo  Player 1 1500.0 → 1530.5 (+30.5)", report)
+        self.assertIn("Batch Elo  Player 1 1500.0 → 1543.5 (+43.5)", report)
 
     def test_same_profile_tournament_is_marked_unrated(self) -> None:
         temporary_directory = tempfile.TemporaryDirectory()
@@ -373,6 +373,8 @@ class TournamentTests(unittest.TestCase):
         self.assertEqual(result.elo.unrated_same_profile_games, 2)
         self.assertEqual(ratings.games_for("standard-material"), 4)
         self.assertEqual(ratings.games_for("equal-minors"), 4)
+        self.assertEqual(ratings.rating_for("standard-material"), 1500.0)
+        self.assertEqual(ratings.rating_for("equal-minors"), 1500.0)
 
     def test_round_robin_report_contains_standings_and_colour_splits(self) -> None:
         result = run_round_robin_tournament(
@@ -394,7 +396,41 @@ class TournamentTests(unittest.TestCase):
         self.assertIn("Player 1 · Standard Material", output)
         self.assertIn("♙ White", output)
         self.assertIn("♟ Black", output)
+        self.assertIn("HEAD-TO-HEAD SCORE (%)", output)
+        self.assertIn("Rows score against columns", output)
+        self.assertIn("P1 = Player 1 · Standard Material", output)
         self.assertIn("Tournament seed  12345", output)
+
+    def test_round_robin_tracks_each_head_to_head_score(self) -> None:
+        games = iter(
+            [
+                CompletedGame(chess.WHITE, "checkmate", 20),
+                CompletedGame(chess.BLACK, "checkmate", 20),
+                CompletedGame(chess.WHITE, "checkmate", 20),
+                CompletedGame(chess.WHITE, "checkmate", 20),
+                CompletedGame(None, "stalemate", 20),
+                CompletedGame(None, "stalemate", 20),
+            ]
+        )
+        result = run_round_robin_tournament(
+            self.config,
+            ["standard-material", "equal-minors", "random"],
+            1,
+            game_runner=lambda _white, _black: next(games),
+        )
+
+        self.assertEqual(
+            (
+                result.head_to_head[0][1].wins,
+                result.head_to_head[0][1].draws,
+                result.head_to_head[0][1].losses,
+            ),
+            (2, 0, 0),
+        )
+        self.assertEqual(result.head_to_head[0][1].score_percentage, 100.0)
+        self.assertEqual(result.head_to_head[1][0].score_percentage, 0.0)
+        self.assertEqual(result.head_to_head[0][2].score_percentage, 50.0)
+        self.assertEqual(result.head_to_head[2][1].score_percentage, 50.0)
 
     def test_round_robin_rejects_invalid_player_and_game_counts(self) -> None:
         with self.assertRaisesRegex(ValueError, "2 to 8 players"):

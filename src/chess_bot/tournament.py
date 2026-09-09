@@ -16,7 +16,7 @@ import chess
 
 from chess_bot.config import BotProfile, EngineConfig
 from chess_bot.engine import ChessBot, create_bot
-from chess_bot.ratings import EloRatings, EloUpdate
+from chess_bot.ratings import BatchEloUpdate, EloRatings, MatchupResult
 
 
 @dataclass(frozen=True)
@@ -93,7 +93,7 @@ class ProfileTournamentStats:
 
 @dataclass
 class TournamentEloStats:
-    k_factor: int
+    prior_std_deviation: int
     self_play: bool
     first_before: float
     first_current: float
@@ -101,12 +101,15 @@ class TournamentEloStats:
     second_current: float
     rated_games: int = 0
 
-    def record(self, update: EloUpdate | None) -> None:
-        if update is None:
-            return
-        self.first_current = update.first_after
-        self.second_current = update.second_after
-        self.rated_games += 1
+    def apply(
+        self,
+        update: BatchEloUpdate,
+        first_profile_id: str,
+        second_profile_id: str,
+    ) -> None:
+        self.first_current = update.after_by_profile[first_profile_id]
+        self.second_current = update.after_by_profile[second_profile_id]
+        self.rated_games = update.rated_games
 
 
 @dataclass
@@ -178,7 +181,7 @@ class TournamentResult:
         first_rating = ratings.rating_for(self.first_white.id)
         second_rating = ratings.rating_for(self.first_black.id)
         self.elo = TournamentEloStats(
-            k_factor=ratings.k_factor,
+            prior_std_deviation=ratings.prior_std_deviation,
             self_play=self.first_white.id == self.first_black.id,
             first_before=first_rating,
             first_current=first_rating,
@@ -189,24 +192,16 @@ class TournamentResult:
 
 @dataclass
 class RoundRobinEloStats:
-    k_factor: int
+    prior_std_deviation: int
     before_by_profile: dict[str, float]
     current_by_profile: dict[str, float]
     rated_games: int = 0
     unrated_same_profile_games: int = 0
 
-    def record(
-        self,
-        first_profile_id: str,
-        second_profile_id: str,
-        update: EloUpdate | None,
-    ) -> None:
-        if update is None:
-            self.unrated_same_profile_games += 1
-            return
-        self.current_by_profile[first_profile_id] = update.first_after
-        self.current_by_profile[second_profile_id] = update.second_after
-        self.rated_games += 1
+    def apply(self, update: BatchEloUpdate) -> None:
+        self.current_by_profile.update(update.after_by_profile)
+        self.rated_games = update.rated_games
+        self.unrated_same_profile_games = update.unrated_same_profile_games
 
 
 @dataclass
@@ -223,6 +218,7 @@ class RoundRobinTournamentResult:
     elapsed_seconds: float = 0.0
     terminations: Counter[str] = field(default_factory=Counter)
     profile_stats: tuple[ProfileTournamentStats, ...] = field(init=False)
+    head_to_head: tuple[tuple[ResultBreakdown, ...], ...] = field(init=False)
     elo: RoundRobinEloStats | None = None
 
     def __post_init__(self) -> None:
@@ -232,6 +228,10 @@ class RoundRobinTournamentResult:
         )
         self.profile_stats = tuple(
             ProfileTournamentStats(profile) for profile in self.profiles
+        )
+        self.head_to_head = tuple(
+            tuple(ResultBreakdown() for _ in self.profiles)
+            for _ in self.profiles
         )
 
     @property
@@ -264,6 +264,14 @@ class RoundRobinTournamentResult:
 
         self.profile_stats[white_player_index].record(chess.WHITE, game.winner)
         self.profile_stats[black_player_index].record(chess.BLACK, game.winner)
+        self.head_to_head[white_player_index][black_player_index].record(
+            chess.WHITE,
+            game.winner,
+        )
+        self.head_to_head[black_player_index][white_player_index].record(
+            chess.BLACK,
+            game.winner,
+        )
 
     def enable_elo(self, ratings: EloRatings) -> None:
         profile_ids = {profile.id for profile in self.profiles}
@@ -272,7 +280,7 @@ class RoundRobinTournamentResult:
             for profile_id in profile_ids
         }
         self.elo = RoundRobinEloStats(
-            k_factor=ratings.k_factor,
+            prior_std_deviation=ratings.prior_std_deviation,
             before_by_profile=before,
             current_by_profile=dict(before),
         )
@@ -358,19 +366,24 @@ def run_tournament(
         )
         completed_game = play_game(white_bot, black_bot)
         result.record_game(completed_game)
-        if ratings is not None and result.elo is not None:
-            first_player_color = chess.WHITE if game_index % 2 == 0 else chess.BLACK
-            first_score = _score_for_color(completed_game.winner, first_player_color)
-            update = ratings.record_game(
-                first_white.id,
-                first_black.id,
-                first_score,
-            )
-            result.elo.record(update)
         result.elapsed_seconds = max(0.0, clock() - started_at)
         if progress_callback is not None:
             progress_callback(result)
 
+    if ratings is not None and result.elo is not None:
+        stats = result.profile_stats[0].overall
+        update = ratings.record_period(
+            [
+                MatchupResult(
+                    first_white.id,
+                    first_black.id,
+                    stats.wins,
+                    stats.draws,
+                    stats.losses,
+                )
+            ]
+        )
+        result.elo.apply(update, first_white.id, first_black.id)
     return result
 
 
@@ -421,7 +434,6 @@ def run_round_robin_tournament(
                     first_seed,
                     second_seed,
                     play_game,
-                    ratings,
                     progress_callback,
                     clock,
                     started_at,
@@ -434,12 +446,14 @@ def run_round_robin_tournament(
                     second_seed,
                     first_seed,
                     play_game,
-                    ratings,
                     progress_callback,
                     clock,
                     started_at,
                 )
 
+    if ratings is not None and result.elo is not None:
+        update = ratings.record_period(_round_robin_rating_results(result))
+        result.elo.apply(update)
     return result
 
 
@@ -451,7 +465,6 @@ def _play_round_robin_pairing(
     white_seed: int,
     black_seed: int,
     play_game: GameRunner,
-    ratings: EloRatings | None,
     progress_callback: RoundRobinProgressCallback | None,
     clock: Clock,
     started_at: float,
@@ -472,17 +485,28 @@ def _play_round_robin_pairing(
     )
     completed_game = play_game(white_bot, black_bot)
     result.record_game(white_player_index, black_player_index, completed_game)
-    if ratings is not None and result.elo is not None:
-        white_score = _score_for_color(completed_game.winner, chess.WHITE)
-        update = ratings.record_game(
-            white_profile.id,
-            black_profile.id,
-            white_score,
-        )
-        result.elo.record(white_profile.id, black_profile.id, update)
     result.elapsed_seconds = max(0.0, clock() - started_at)
     if progress_callback is not None:
         progress_callback(result)
+
+
+def _round_robin_rating_results(
+    result: RoundRobinTournamentResult,
+) -> list[MatchupResult]:
+    matchups: list[MatchupResult] = []
+    for first_index in range(len(result.profiles) - 1):
+        for second_index in range(first_index + 1, len(result.profiles)):
+            stats = result.head_to_head[first_index][second_index]
+            matchups.append(
+                MatchupResult(
+                    result.profiles[first_index].id,
+                    result.profiles[second_index].id,
+                    stats.wins,
+                    stats.draws,
+                    stats.losses,
+                )
+            )
+    return matchups
 
 
 def _play_game(white_bot: ChessBot, black_bot: ChessBot) -> CompletedGame:
@@ -506,12 +530,3 @@ def _percentage(amount: int, total: int) -> float:
     if not total:
         return 0.0
     return 100.0 * amount / total
-
-
-def _score_for_color(
-    winner: chess.Color | None,
-    color: chess.Color,
-) -> float:
-    if winner is None:
-        return 0.5
-    return 1.0 if winner == color else 0.0

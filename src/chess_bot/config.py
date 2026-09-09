@@ -134,7 +134,7 @@ class EngineConfig:
     draw_score: int
     search_max_depth: int
     elo_initial_rating: int
-    elo_k_factor: int
+    elo_prior_std_deviation: int
     elo_ratings_file: Path
     tournament_default_games: int
     tournament_default_seed: int | None
@@ -283,8 +283,11 @@ def load_engine_config(path: str | Path | None = None) -> EngineConfig:
     elo_initial_rating = _positive_integer(
         elo, "initial_rating", "elo.initial_rating", default=1500
     )
-    elo_k_factor = _positive_integer(
-        elo, "k_factor", "elo.k_factor", default=16
+    elo_prior_std_deviation = _positive_integer(
+        elo,
+        "prior_std_deviation",
+        "elo.prior_std_deviation",
+        default=100,
     )
     elo_ratings_file_name = elo.get("ratings_file", "bot-ratings.json")
     if not isinstance(elo_ratings_file_name, str) or not elo_ratings_file_name.strip():
@@ -365,7 +368,7 @@ def load_engine_config(path: str | Path | None = None) -> EngineConfig:
         draw_score=draw_score,
         search_max_depth=search_max_depth,
         elo_initial_rating=elo_initial_rating,
-        elo_k_factor=elo_k_factor,
+        elo_prior_std_deviation=elo_prior_std_deviation,
         elo_ratings_file=elo_ratings_file,
         tournament_default_games=tournament_default_games,
         tournament_default_seed=tournament_default_seed,

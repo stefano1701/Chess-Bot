@@ -327,12 +327,12 @@ def format_tournament_progress(
             lines.append(f"│ Endings  {endings}")
         if result.elo is not None:
             if result.elo.self_play:
-                lines.append("│ Elo  Unchanged · same-profile self-play is unrated")
+                lines.append("│ Batch Elo  Unchanged · same-profile self-play is unrated")
             else:
                 first_delta = result.elo.first_current - result.elo.first_before
                 second_delta = result.elo.second_current - result.elo.second_before
                 lines.append(
-                    f"│ Elo  Player 1 {result.elo.first_before:.1f} → "
+                    f"│ Batch Elo  Player 1 {result.elo.first_before:.1f} → "
                     f"{result.elo.first_current:.1f} ({first_delta:+.1f}) | "
                     f"Player 2 {result.elo.second_before:.1f} → "
                     f"{result.elo.second_current:.1f} ({second_delta:+.1f})"
@@ -387,9 +387,12 @@ def format_round_robin_progress(
         ),
     ]
     if result.elo is not None:
-        lines.append(
-            f"  Elo: rated between different profiles · K={result.elo.k_factor}; "
-            "same-profile games are unrated"
+        lines.extend(
+            [
+                "  Elo: cumulative batch ratings · calculated after all games",
+                f"  Rating prior: σ={result.elo.prior_std_deviation} Elo · "
+                "same-profile games are unrated",
+            ]
         )
     lines.extend(["", "┌─ STANDINGS"])
 
@@ -426,6 +429,8 @@ def format_round_robin_progress(
         lines.extend(
             [
                 "",
+                *_format_head_to_head_matrix(result),
+                "",
                 "┌─ TOURNAMENT TOTALS",
                 (
                     f"│ White wins  {result.white_wins} "
@@ -448,7 +453,7 @@ def format_round_robin_progress(
             lines.append(f"│ Endings  {endings}")
         if result.elo is not None:
             lines.append(
-                f"│ Elo  {result.elo.rated_games} rated games · "
+                f"│ Batch Elo  {result.elo.rated_games} rated games · "
                 f"{result.elo.unrated_same_profile_games} same-profile games unrated"
             )
         lines.append("└" + "─" * 70)
@@ -463,6 +468,37 @@ def _format_result_line(label: str, results: ResultBreakdown) -> str:
         f"Win {results.win_percentage:5.1f}%  "
         f"Score {results.score_percentage:5.1f}%"
     )
+
+
+def _format_head_to_head_matrix(
+    result: RoundRobinTournamentResult,
+) -> list[str]:
+    """Render each entrant's score percentage against every other entrant."""
+    player_count = len(result.profiles)
+    labels = [f"P{index}" for index in range(1, player_count + 1)]
+    lines = [
+        "┌─ HEAD-TO-HEAD SCORE (%)",
+        "│ Rows score against columns · draws count as half a point",
+        "│      " + " ".join(f"{label:>6}" for label in labels),
+    ]
+    for row_index, label in enumerate(labels):
+        cells: list[str] = []
+        for column_index in range(player_count):
+            if row_index == column_index:
+                cells.append(f"{'—':>6}")
+            else:
+                score = result.head_to_head[row_index][column_index].score_percentage
+                cells.append(f"{score:>6.1f}")
+        lines.append(f"│ {label:<3}  " + " ".join(cells))
+    lines.extend(
+        f"│ {label} = Player {index} · {profile.name}"
+        for index, (label, profile) in enumerate(
+            zip(labels, result.profiles, strict=True),
+            start=1,
+        )
+    )
+    lines.append("└" + "─" * 70)
+    return lines
 
 
 def _profile_strategy_text(profile: BotProfile) -> str:
@@ -485,7 +521,10 @@ def _elo_status_text(result: TournamentResult) -> str:
         return ""
     if result.elo.self_play:
         return "  Elo: unrated self-play (both players use the same profile)"
-    return f"  Elo: rated tournament · K={result.elo.k_factor}"
+    return (
+        "  Elo: cumulative batch rating after all games · "
+        f"prior σ={result.elo.prior_std_deviation}"
+    )
 
 
 def _profile_elo_line(
@@ -500,8 +539,10 @@ def _profile_elo_line(
     else:
         before = result.elo.second_before
         current = result.elo.second_current
+    if not result.elo.self_play and not result.elo.rated_games:
+        return f"│   Batch Elo {current:.1f}  (update pending)"
     delta = current - before
-    return f"│   Elo {current:.1f}  ({delta:+.1f} this tournament)"
+    return f"│   Batch Elo {current:.1f}  ({delta:+.1f} this tournament)"
 
 
 def _round_robin_profile_elo_line(
@@ -513,8 +554,13 @@ def _round_robin_profile_elo_line(
     profile_id = result.profiles[player_index].id
     before = result.elo.before_by_profile[profile_id]
     current = result.elo.current_by_profile[profile_id]
+    has_rated_opponent = any(
+        opponent.id != profile_id for opponent in result.profiles
+    )
+    if has_rated_opponent and not result.elo.rated_games:
+        return f"│     Batch Elo {current:.1f}  (update pending)"
     delta = current - before
-    return f"│     Elo {current:.1f}  ({delta:+.1f} this tournament)"
+    return f"│     Batch Elo {current:.1f}  ({delta:+.1f} this tournament)"
 
 
 def _performance_summary_lines(result: TournamentResult) -> list[str]:
@@ -1021,7 +1067,7 @@ def main() -> None:
         ratings = EloRatings.load(
             config.elo_ratings_file,
             initial_rating=config.elo_initial_rating,
-            k_factor=config.elo_k_factor,
+            prior_std_deviation=config.elo_prior_std_deviation,
         )
     except (ConfigError, RatingError) as error:
         print(f"Configuration error: {error}")
@@ -1031,6 +1077,11 @@ def main() -> None:
         clear_screen()
         print(TITLE)
         print("\nLearn chess programming one idea at a time.\n")
+        if ratings.legacy_ratings_reset:
+            print(
+                "Rating note: legacy Elo reset to 1500 for batch rating; "
+                "lifetime W/D/L is preserved.\n"
+            )
         print(f"Default: {profile_summary(config.default_profile, ratings)}")
         print("1. Play against a bot")
         print("2. Watch bot vs bot")

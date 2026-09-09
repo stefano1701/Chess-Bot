@@ -168,7 +168,7 @@ emergency_time_ms = 0
 
 [elo]
 initial_rating = 1500
-k_factor = 16
+prior_std_deviation = 100  # Regularizes sparse batch results; lower = steadier.
 ratings_file = "bot-ratings.json"
 
 [tournament]
