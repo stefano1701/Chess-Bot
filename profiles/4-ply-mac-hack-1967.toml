@@ -1,11 +1,11 @@
 [profile]
-name = "2 ply Kaufman 1999"
+name = "4 ply Mac Hack 1967"
 strategy = "minimax"
-description = "Depth-2 material profile using Larry Kaufman's 1999 point values."
+description = "Depth-4 material profile using the Mac Hack program's 1967 point values."
 random_seed = -1
 
 [search]
-depth = 2
+depth = 4
 
 [evaluation]
 piece_square_tables = 0.0
@@ -13,7 +13,7 @@ piece_square_tables = 0.0
 [material]
 pawn = 100
 knight = 325
-bishop = 325
+bishop = 350
 rook = 500
 queen = 975
 king = 0

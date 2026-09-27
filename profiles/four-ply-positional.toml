@@ -1,11 +1,11 @@
 [profile]
-name = "Two-Ply Positional"
+name = "Four-Ply Positional"
 strategy = "minimax"
 description = "Adds piece-square values for activity, development, and king safety."
 random_seed = -1
 
 [search]
-depth = 2
+depth = 4
 
 [evaluation]
 piece_square_tables = 1.0

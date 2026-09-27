@@ -1,11 +1,11 @@
 [profile]
-name = "2 ply Chess 4.5 1977"
+name = "4 ply Chess 4.5 1977"
 strategy = "minimax"
-description = "Depth-2 material profile using the Chess 4.5 program's 1977 point values."
+description = "Depth-4 material profile using the Chess 4.5 program's 1977 point values."
 random_seed = -1
 
 [search]
-depth = 2
+depth = 4
 
 [evaluation]
 piece_square_tables = 0.0

@@ -277,7 +277,7 @@ def load_engine_config(path: str | Path | None = None) -> EngineConfig:
     if not isinstance(search, dict):
         raise ConfigError("engine.search must be a table.")
     search_max_depth = _positive_integer(
-        search, "max_depth", "search.max_depth", default=2
+        search, "max_depth", "search.max_depth", default=4
     )
     search_move_ordering = search.get("move_ordering", "captures")
     if search_move_ordering not in {"none", "captures"}:

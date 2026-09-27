@@ -1,11 +1,11 @@
 [profile]
-name = "2 ply Shannon 1949"
+name = "4 ply Shannon 1949"
 strategy = "minimax"
-description = "Depth-2 material profile using Claude Shannon's 1949 point values."
+description = "Depth-4 material profile using Claude Shannon's 1949 point values."
 random_seed = -1
 
 [search]
-depth = 2
+depth = 4
 
 [evaluation]
 piece_square_tables = 0.0

@@ -1,11 +1,11 @@
 [profile]
-name = "2 ply Berliner 1999"
+name = "4 ply Berliner 1999"
 strategy = "minimax"
-description = "Depth-2 material profile using Hans Berliner's 1999 point values."
+description = "Depth-4 material profile using Hans Berliner's 1999 point values."
 random_seed = -1
 
 [search]
-depth = 2
+depth = 4
 
 [evaluation]
 piece_square_tables = 0.0

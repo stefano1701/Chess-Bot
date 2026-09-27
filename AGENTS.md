@@ -15,12 +15,12 @@ to a mature engine or hide the interesting decisions behind an external engine.
 
 ## Current milestone
 
-Version: 0.15.0
+Version: 0.15.1
 
 Three strategies are implemented: `random`, `one_ply`, and `minimax`. The one-ply
 strategy chooses the best immediate material result. Minimax searches to the
-profile's fixed depth, maximizing on White's turns and minimizing on Black's, so
-depth 2 examines the opponent's best immediate reply. Alpha-beta pruning removes
+profile's fixed depth, maximizing on White's turns and minimizing on Black's. The
+bundled minimax profiles now search to depth 4. Alpha-beta pruning removes
 branches that cannot change the result, while promotions and captures are
 searched first to improve pruning. Terminal mate and draw scores are respected
 at any searched depth. Profiles may add named, editable static piece-square table
@@ -68,7 +68,7 @@ The terminal application currently supports:
   shared tuning values. Read it before doing engine work.
 - `profiles/*.toml`: bot names, strategies, seeds, and optional material-value
   overrides, search depth, table set, and positional weights. Bundled examples
-  include eleven material-only depth-2 profiles drawn from the historical value
+  include eleven material-only depth-4 profiles drawn from the historical value
   sets in the Chess Programming Wiki Point Value table. Coxeter's otherwise
   unspecified pawn is explicitly assumed to be 100.
 - `piece-square-tables/*.toml`: named positional table sets. Every file contains
@@ -137,7 +137,7 @@ ID under `[evaluation]`, plus any of the six defaults under
 Every table-set file must provide an 8×8 integer-centipawn matrix for each of
 `pawn`, `knight`, `bishop`, `rook`, `queen`, and `king`. Matrices are rank 1 to 8,
 with each row ordered file a to h. Black square values are looked up through
-`chess.square_mirror()`. The built-in `two-ply-positional` profile selects the
+`chess.square_mirror()`. The built-in `four-ply-positional` profile selects the
 `simplified` set with all weights at 1. The tables remain static and have no
 opening/endgame interpolation.
 

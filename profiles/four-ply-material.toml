@@ -1,11 +1,11 @@
 [profile]
-name = "Two-Ply Material"
+name = "Four-Ply Material"
 strategy = "minimax"
-description = "Looks at every move and the opponent's best immediate reply."
+description = "Looks two moves ahead for both players with alpha-beta minimax."
 random_seed = -1
 
 [search]
-depth = 2
+depth = 4
 
 # Material values are inherited from engine.toml:
 # pawn=100, knight=320, bishop=330, rook=500, queen=900.

@@ -1,18 +1,18 @@
 [profile]
-name = "2 ply Coxeter 1940"
+name = "4 ply Euwe & Kramer 1944"
 strategy = "minimax"
-description = "Depth-2 material profile using Coxeter's 1940 piece values with pawn assumed to be 100."
+description = "Depth-4 material profile using Euwe and Kramer's 1944 point values."
 random_seed = -1
 
 [search]
-depth = 2
+depth = 4
 
 [evaluation]
 piece_square_tables = 0.0
 
 [material]
 pawn = 100
-knight = 300
+knight = 350
 bishop = 350
 rook = 550
 queen = 1000

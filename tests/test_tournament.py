@@ -142,7 +142,7 @@ class TournamentTests(unittest.TestCase):
     def test_performance_elo_and_score_confidence_interval(self) -> None:
         result = TournamentResult(
             1000,
-            self.config.get_profile("two-ply-material"),
+            self.config.get_profile("four-ply-material"),
             self.config.get_profile("equal-minors"),
             seed=42,
         )
@@ -276,7 +276,7 @@ class TournamentTests(unittest.TestCase):
             "standard-material",
             "equal-minors",
             "random",
-            "two-ply-material",
+            "four-ply-material",
         ]
         oriented_pairings: list[tuple[str, str]] = []
         progress_counts: list[int] = []

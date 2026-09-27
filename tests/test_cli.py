@@ -25,7 +25,7 @@ from chess_bot.config import load_engine_config
 
 class ProfileMenuTests(unittest.TestCase):
     def test_positional_profile_summary_shows_its_weight(self) -> None:
-        profile = load_engine_config().get_profile("two-ply-positional")
+        profile = load_engine_config().get_profile("four-ply-positional")
 
         self.assertIn(
             "PST simplified ×1 [P=1 N=1 B=1 R=1 Q=1 K=1]",
@@ -85,7 +85,7 @@ class ProfileMenuTests(unittest.TestCase):
         self.assertEqual(profile_data["material"]["rook"], 500)
         self.assertEqual(profile_data["material"]["queen"], 900)
         self.assertEqual(profile_data["profile"]["strategy"], "minimax")
-        self.assertEqual(profile_data["search"]["depth"], 2)
+        self.assertEqual(profile_data["search"]["depth"], 4)
         self.assertEqual(profile_data["evaluation"]["piece_square_tables"], 1.5)
         self.assertEqual(
             profile_data["evaluation"]["piece_square_table_set"], "simplified"

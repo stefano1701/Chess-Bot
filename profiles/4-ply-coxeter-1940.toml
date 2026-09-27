@@ -1,11 +1,11 @@
 [profile]
-name = "2 ply Turing 1953"
+name = "4 ply Coxeter 1940"
 strategy = "minimax"
-description = "Depth-2 material profile using Alan Turing's 1953 point values."
+description = "Depth-4 material profile using Coxeter's 1940 piece values with pawn assumed to be 100."
 random_seed = -1
 
 [search]
-depth = 2
+depth = 4
 
 [evaluation]
 piece_square_tables = 0.0
@@ -14,6 +14,6 @@ piece_square_tables = 0.0
 pawn = 100
 knight = 300
 bishop = 350
-rook = 500
+rook = 550
 queen = 1000
 king = 0

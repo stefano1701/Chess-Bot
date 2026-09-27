@@ -1,19 +1,19 @@
 [profile]
-name = "2 ply Kaufman 2012"
+name = "4 ply Turing 1953"
 strategy = "minimax"
-description = "Depth-2 material profile using Larry Kaufman's 2012 point values."
+description = "Depth-4 material profile using Alan Turing's 1953 point values."
 random_seed = -1
 
 [search]
-depth = 2
+depth = 4
 
 [evaluation]
 piece_square_tables = 0.0
 
 [material]
 pawn = 100
-knight = 350
+knight = 300
 bishop = 350
-rook = 525
+rook = 500
 queen = 1000
 king = 0

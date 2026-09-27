@@ -816,7 +816,10 @@ def create_material_profile_interactively(config: EngineConfig) -> str | None:
         queen=_prompt_piece_value("Queen", defaults.queen),
         king=0,
     )
-    print("A ply is one player's move. Depth 2 also examines the opponent's reply.")
+    print(
+        "A ply is one player's move. Depth 2 examines the opponent's reply; "
+        "depth 4 examines two moves by each player."
+    )
     search_depth = _prompt_search_depth(config.search_max_depth)
     piece_square_weight = 0.0
     piece_square_table_set_id = config.default_piece_square_table_set_id

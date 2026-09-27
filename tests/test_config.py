@@ -20,14 +20,14 @@ class ProfileConfigTests(unittest.TestCase):
     def test_default_config_provides_the_initial_profiles(self) -> None:
         config = load_engine_config()
 
-        self.assertEqual(config.default_profile_id, "two-ply-material")
+        self.assertEqual(config.default_profile_id, "four-ply-material")
         self.assertTrue(
             {
                 "random",
                 "standard-material",
                 "equal-minors",
-                "two-ply-material",
-                "two-ply-positional",
+                "four-ply-material",
+                "four-ply-positional",
             }
             <= set(config.profiles)
         )
@@ -35,19 +35,19 @@ class ProfileConfigTests(unittest.TestCase):
         self.assertIsInstance(
             create_bot(config, "standard-material"), OnePlyMaterialBot
         )
-        minimax_bot = create_bot(config, "two-ply-material")
+        minimax_bot = create_bot(config, "four-ply-material")
         self.assertIsInstance(minimax_bot, MinimaxBot)
-        self.assertEqual(minimax_bot.depth, 2)
+        self.assertEqual(minimax_bot.depth, 4)
         self.assertTrue(minimax_bot.alpha_beta)
         self.assertEqual(minimax_bot.move_ordering, "captures")
-        positional = config.get_profile("two-ply-positional")
+        positional = config.get_profile("four-ply-positional")
         positional_bot = create_bot(config, positional.id)
-        self.assertEqual(positional.search_depth, 2)
+        self.assertEqual(positional.search_depth, 4)
         self.assertEqual(positional.piece_square_weight, 1.0)
         self.assertEqual(positional.piece_square_table_set_id, "simplified")
         self.assertEqual(positional.piece_square_weights, PieceSquareWeights())
         self.assertEqual(positional_bot.evaluator.piece_square_weight, 1.0)
-        self.assertEqual(config.get_profile("two-ply-material").piece_square_weight, 0)
+        self.assertEqual(config.get_profile("four-ply-material").piece_square_weight, 0)
         self.assertEqual(config.tournament_default_games, 20)
         self.assertEqual(config.tournament_progress_bar_width, 32)
         self.assertEqual(config.tournament_results_file.name, "tournament-results.txt")
@@ -68,20 +68,20 @@ class ProfileConfigTests(unittest.TestCase):
         self.assertEqual(standard_bot.evaluator.values, standard)
         self.assertEqual(equal_minors_bot.evaluator.values, equal_minors)
 
-    def test_historical_depth_two_profiles_match_published_point_values(self) -> None:
+    def test_historical_depth_four_profiles_match_published_point_values(self) -> None:
         config = load_engine_config()
         expected_values = {
-            "2-ply-coxeter-1940": (100, 300, 350, 550, 1000),
-            "2-ply-euwe-kramer-1944": (100, 350, 350, 550, 1000),
-            "2-ply-shannon-1949": (100, 300, 300, 500, 900),
-            "2-ply-turing-1953": (100, 300, 350, 500, 1000),
-            "2-ply-mac-hack-1967": (100, 325, 350, 500, 975),
-            "2-ply-chess-4-5-1977": (100, 325, 350, 500, 900),
-            "2-ply-michniewski-1995": (100, 320, 330, 500, 900),
-            "2-ply-berliner-1999": (100, 320, 333, 510, 880),
-            "2-ply-kaufman-1999": (100, 325, 325, 500, 975),
-            "2-ply-fruit-et-al-2005": (100, 400, 400, 600, 1200),
-            "2-ply-kaufman-2012": (100, 350, 350, 525, 1000),
+            "4-ply-coxeter-1940": (100, 300, 350, 550, 1000),
+            "4-ply-euwe-kramer-1944": (100, 350, 350, 550, 1000),
+            "4-ply-shannon-1949": (100, 300, 300, 500, 900),
+            "4-ply-turing-1953": (100, 300, 350, 500, 1000),
+            "4-ply-mac-hack-1967": (100, 325, 350, 500, 975),
+            "4-ply-chess-4-5-1977": (100, 325, 350, 500, 900),
+            "4-ply-michniewski-1995": (100, 320, 330, 500, 900),
+            "4-ply-berliner-1999": (100, 320, 333, 510, 880),
+            "4-ply-kaufman-1999": (100, 325, 325, 500, 975),
+            "4-ply-fruit-et-al-2005": (100, 400, 400, 600, 1200),
+            "4-ply-kaufman-2012": (100, 350, 350, 525, 1000),
         }
 
         for profile_id, expected in expected_values.items():
@@ -89,7 +89,7 @@ class ProfileConfigTests(unittest.TestCase):
                 profile = config.get_profile(profile_id)
                 material = profile.material
                 self.assertEqual(profile.strategy, "minimax")
-                self.assertEqual(profile.search_depth, 2)
+                self.assertEqual(profile.search_depth, 4)
                 self.assertEqual(profile.piece_square_weight, 0.0)
                 self.assertEqual(
                     (
@@ -107,8 +107,8 @@ class ProfileConfigTests(unittest.TestCase):
         config = load_engine_config()
 
         self.assertTrue(config.settings["search"]["enabled"])
-        self.assertEqual(config.settings["search"]["max_depth"], 2)
-        self.assertEqual(config.search_max_depth, 2)
+        self.assertEqual(config.settings["search"]["max_depth"], 4)
+        self.assertEqual(config.search_max_depth, 4)
         self.assertTrue(config.search_alpha_beta)
         self.assertEqual(config.search_move_ordering, "captures")
         self.assertEqual(config.elo_initial_rating, 1500)

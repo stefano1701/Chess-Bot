@@ -57,11 +57,11 @@ Set a different size for one launch with, for example,
 ## Engine configuration
 
 [`engine.toml`](engine.toml) controls shared engine behavior and points to the
-[`profiles`](profiles) directory. The default is the two-ply minimax bot:
+[`profiles`](profiles) directory. The default is the four-ply minimax bot:
 
 ```toml
 [engine]
-default_profile = "two-ply-material"
+default_profile = "four-ply-material"
 profiles_directory = "profiles"
 ```
 
@@ -70,36 +70,40 @@ Sixteen profiles are bundled:
 - **Random Bot:** chooses any legal move uniformly.
 - **Standard Material:** one ply; `P=100, N=320, B=330, R=500, Q=900`.
 - **Equal Minor Pieces:** one ply; `P=100, N=300, B=300, R=500, Q=900`.
-- **Two-Ply Material:** minimax depth 2; standard material values.
-- **Two-Ply Positional:** minimax depth 2; standard material plus piece-square
+- **Four-Ply Material:** minimax depth 4; standard material values.
+- **Four-Ply Positional:** minimax depth 4; standard material plus piece-square
   tables at weight 1.
 
-Eleven additional material-only, depth-2 profiles reproduce the historical value
+Eleven additional material-only, depth-4 profiles reproduce the historical value
 sets in the Chess Programming Wiki's
 [Point Value table](https://chessprogramming.org/Point_Value):
 
 | Profile | Pawn | Knight | Bishop | Rook | Queen |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| 2 ply Coxeter 1940¹ | 100 | 300 | 350 | 550 | 1000 |
-| 2 ply Euwe & Kramer 1944 | 100 | 350 | 350 | 550 | 1000 |
-| 2 ply Shannon 1949 | 100 | 300 | 300 | 500 | 900 |
-| 2 ply Turing 1953 | 100 | 300 | 350 | 500 | 1000 |
-| 2 ply Mac Hack 1967 | 100 | 325 | 350 | 500 | 975 |
-| 2 ply Chess 4.5 1977 | 100 | 325 | 350 | 500 | 900 |
-| 2 ply Michniewski 1995 | 100 | 320 | 330 | 500 | 900 |
-| 2 ply Berliner 1999 | 100 | 320 | 333 | 510 | 880 |
-| 2 ply Kaufman 1999 | 100 | 325 | 325 | 500 | 975 |
-| 2 ply Fruit et al 2005 | 100 | 400 | 400 | 600 | 1200 |
-| 2 ply Kaufman 2012 | 100 | 350 | 350 | 525 | 1000 |
+| 4 ply Coxeter 1940¹ | 100 | 300 | 350 | 550 | 1000 |
+| 4 ply Euwe & Kramer 1944 | 100 | 350 | 350 | 550 | 1000 |
+| 4 ply Shannon 1949 | 100 | 300 | 300 | 500 | 900 |
+| 4 ply Turing 1953 | 100 | 300 | 350 | 500 | 1000 |
+| 4 ply Mac Hack 1967 | 100 | 325 | 350 | 500 | 975 |
+| 4 ply Chess 4.5 1977 | 100 | 325 | 350 | 500 | 900 |
+| 4 ply Michniewski 1995 | 100 | 320 | 330 | 500 | 900 |
+| 4 ply Berliner 1999 | 100 | 320 | 333 | 510 | 880 |
+| 4 ply Kaufman 1999 | 100 | 325 | 325 | 500 | 975 |
+| 4 ply Fruit et al 2005 | 100 | 400 | 400 | 600 | 1200 |
+| 4 ply Kaufman 2012 | 100 | 350 | 350 | 525 | 1000 |
 
 ¹ Coxeter's source row does not specify a pawn value. This profile uses the
 requested assumption `P=100` and preserves the four listed piece values.
 
 The one-ply bots inspect every legal move and select the best immediate material
-score. The minimax bot also inspects every legal opponent reply, assumes the
-opponent chooses the reply worst for it, and selects the move with the best
-surviving score. Equal best moves are selected randomly. Search depth is measured
-in plies: one ply is one player's move, so depth 2 means our move plus their reply.
+score. The minimax bot searches recursively to the profile's configured depth,
+assuming that each player chooses the best continuation. Equal best moves are
+selected randomly. Search depth is measured in plies: one ply is one player's
+move, so depth 4 means our move, their reply, our next move, and their next reply.
+
+The former depth-2 profile IDs were replaced when these bots moved to depth 4.
+This deliberately gives each changed engine a fresh Elo identity instead of
+mixing its new games with ratings earned by the shallower version.
 
 Alpha-beta pruning now produces the same minimax decision without finishing
 branches that cannot improve either player's result. The search considers

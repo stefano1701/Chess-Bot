@@ -1,11 +1,11 @@
 [profile]
-name = "2 ply Fruit et al 2005"
+name = "4 ply Fruit et al 2005"
 strategy = "minimax"
-description = "Depth-2 material profile using the Fruit and related engines' 2005 point values."
+description = "Depth-4 material profile using the Fruit and related engines' 2005 point values."
 random_seed = -1
 
 [search]
-depth = 2
+depth = 4
 
 [evaluation]
 piece_square_tables = 0.0
