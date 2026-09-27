@@ -114,6 +114,68 @@ class MinimaxBotTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "depth must be positive"):
             MinimaxBot(self.bot.evaluator, depth=0)
 
+    def test_alpha_beta_matches_exhaustive_minimax_with_fewer_nodes(self) -> None:
+        board = chess.Board()
+        original_fen = board.fen()
+        exhaustive = MinimaxBot(
+            self.bot.evaluator,
+            depth=3,
+            rng=random.Random(11),
+            alpha_beta=False,
+            move_ordering="captures",
+        )
+        optimized = MinimaxBot(
+            self.bot.evaluator,
+            depth=3,
+            rng=random.Random(11),
+            alpha_beta=True,
+            move_ordering="captures",
+        )
+
+        exhaustive_move = exhaustive.choose_move(board)
+        optimized_move = optimized.choose_move(board)
+
+        self.assertEqual(optimized_move, exhaustive_move)
+        self.assertEqual(board.fen(), original_fen)
+        self.assertGreater(optimized.last_search_stats.cutoffs, 0)
+        self.assertLess(
+            optimized.last_search_stats.nodes,
+            exhaustive.last_search_stats.nodes,
+        )
+
+    def test_capture_ordering_reduces_alpha_beta_nodes(self) -> None:
+        board = chess.Board(
+            "r1bq1rk1/2p1bppp/p1np1n2/1p2p3/4P3/1BP2N1P/"
+            "PP1P1PP1/RNBQR1K1 b - - 0 9"
+        )
+        unordered = MinimaxBot(
+            self.bot.evaluator,
+            depth=3,
+            rng=random.Random(11),
+            alpha_beta=True,
+            move_ordering="none",
+        )
+        ordered = MinimaxBot(
+            self.bot.evaluator,
+            depth=3,
+            rng=random.Random(11),
+            alpha_beta=True,
+            move_ordering="captures",
+        )
+
+        unordered_move = unordered.choose_move(board)
+        ordered_move = ordered.choose_move(board)
+
+        self.assertEqual(ordered_move, unordered_move)
+        self.assertLess(
+            ordered.last_search_stats.nodes,
+            unordered.last_search_stats.nodes,
+        )
+
+    def test_rejects_unknown_move_ordering(self) -> None:
+        with self.assertRaisesRegex(ValueError, "Move ordering"):
+            MinimaxBot(self.bot.evaluator, depth=2, move_ordering="unknown")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -2,8 +2,9 @@
 
 A deliberately simple chess bot for learning how chess engines evaluate positions
 and search game trees. It includes random and one-ply baselines plus fixed-depth
-minimax, which assumes the opponent will choose their strongest available reply.
-An optional piece-square evaluation adds a first layer of positional knowledge.
+minimax with alpha-beta pruning, which assumes the opponent will choose their
+strongest available reply. An optional piece-square evaluation adds a first layer
+of positional knowledge.
 
 ## Current features
 
@@ -17,7 +18,7 @@ An optional piece-square evaluation adds a first layer of positional knowledge.
   for bot profiles
 - Create material/positional profiles with a chosen search depth and positional
   weight from the terminal menu
-- See how many positions minimax examined after each move
+- See how many positions minimax examined and pruned after each move
 - Filled Unicode checkerboard with white and shaded squares, rotated to the
   human player's point of view
 - Enter moves in standard algebraic notation (`e4`, `Nf3`, `Qh5`) or coordinate
@@ -100,6 +101,25 @@ opponent chooses the reply worst for it, and selects the move with the best
 surviving score. Equal best moves are selected randomly. Search depth is measured
 in plies: one ply is one player's move, so depth 2 means our move plus their reply.
 
+Alpha-beta pruning now produces the same minimax decision without finishing
+branches that cannot improve either player's result. The search considers
+promotions and valuable captures before quiet moves, which helps it establish
+useful bounds earlier. Both optimisations are controlled in `engine.toml`:
+
+```toml
+[search]
+move_ordering = "captures"  # Or "none" for legal move order.
+
+[search.pruning]
+alpha_beta = true           # False restores exhaustive minimax.
+```
+
+On the development machine, a depth-4 search from the initial position fell from
+206,603 nodes and 14.9 seconds to 1,434 nodes and 0.11 seconds. Exact time varies
+by computer and position; a representative middlegame took about 0.61 seconds at
+depth 4. Large four-ply tournaments remain substantially more expensive than
+two-ply tournaments.
+
 The positional profile adds small centipawn bonuses or penalties according to the
 square occupied by each piece. Its tables encourage central knights, developed
 bishops and pawns, active rooks and queens, advanced pawns, and king safety near
@@ -157,8 +177,8 @@ written, and values such as 0.5 or 1.5 make an influence weaker or stronger.
 Depth 1 creates the original one-ply strategy; depth 2 or higher creates a minimax
 profile. Each custom profile is saved as an editable TOML file in `profiles/` and
 automatically appears in the play, spectator, and tournament selection menus.
-Depth 4 and above may become slow without the pruning planned for a later
-milestone.
+Depth 4 is now practical for individual games, although large depth-4 tournaments
+can still take a long time.
 
 Choose **Run a bot tournament** to compare two bot players over multiple games.
 Each player may use a different profile, or both may use the same profile to show

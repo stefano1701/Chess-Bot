@@ -959,6 +959,8 @@ def _bot_move_status(bot: ChessBot, notation: str) -> str:
             f" Searched {search_stats.nodes:,} positions "
             f"to depth {search_stats.depth}."
         )
+        if search_stats.cutoffs:
+            status += f" Alpha-beta cutoffs: {search_stats.cutoffs:,}."
     return status
 
 

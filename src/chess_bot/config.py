@@ -133,6 +133,8 @@ class EngineConfig:
     mate_score: int
     draw_score: int
     search_max_depth: int
+    search_alpha_beta: bool
+    search_move_ordering: str
     elo_initial_rating: int
     elo_prior_std_deviation: int
     elo_ratings_file: Path
@@ -277,6 +279,18 @@ def load_engine_config(path: str | Path | None = None) -> EngineConfig:
     search_max_depth = _positive_integer(
         search, "max_depth", "search.max_depth", default=2
     )
+    search_move_ordering = search.get("move_ordering", "captures")
+    if search_move_ordering not in {"none", "captures"}:
+        raise ConfigError("search.move_ordering must be 'none' or 'captures'.")
+    pruning = search.get("pruning", {})
+    if not isinstance(pruning, dict):
+        raise ConfigError("search.pruning must be a table.")
+    search_alpha_beta = _boolean(
+        pruning,
+        "alpha_beta",
+        "search.pruning.alpha_beta",
+        default=True,
+    )
     elo = settings.get("elo", {})
     if not isinstance(elo, dict):
         raise ConfigError("engine.elo must be a table.")
@@ -367,6 +381,8 @@ def load_engine_config(path: str | Path | None = None) -> EngineConfig:
         mate_score=mate_score,
         draw_score=draw_score,
         search_max_depth=search_max_depth,
+        search_alpha_beta=search_alpha_beta,
+        search_move_ordering=search_move_ordering,
         elo_initial_rating=elo_initial_rating,
         elo_prior_std_deviation=elo_prior_std_deviation,
         elo_ratings_file=elo_ratings_file,

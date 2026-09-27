@@ -15,17 +15,19 @@ to a mature engine or hide the interesting decisions behind an external engine.
 
 ## Current milestone
 
-Version: 0.14.1
+Version: 0.15.0
 
 Three strategies are implemented: `random`, `one_ply`, and `minimax`. The one-ply
 strategy chooses the best immediate material result. Minimax searches to the
 profile's fixed depth, maximizing on White's turns and minimizing on Black's, so
-depth 2 examines the opponent's best immediate reply. Terminal mate and draw
-scores are respected at any searched depth. Profiles may add named, editable
-static piece-square table sets to material, with both an overall weight and six
-per-piece weights. There is no alpha-beta pruning, move ordering, pawn-structure
-or mobility evaluation, game-phase interpolation, tactical/quiescence search,
-opening book, tablebase, clock management, or online adapter yet.
+depth 2 examines the opponent's best immediate reply. Alpha-beta pruning removes
+branches that cannot change the result, while promotions and captures are
+searched first to improve pruning. Terminal mate and draw scores are respected
+at any searched depth. Profiles may add named, editable static piece-square table
+sets to material, with both an overall weight and six per-piece weights. There is
+no pawn-structure or mobility evaluation, game-phase interpolation,
+tactical/quiescence search, opening book, transposition table, clock management,
+or online adapter yet.
 
 The terminal application currently supports:
 
@@ -48,7 +50,8 @@ The terminal application currently supports:
 - Interactive creation of material profiles with a configurable search depth.
 - A table-set chooser, overall piece-square weight, and six per-piece weights when
   creating profiles. Zero keeps the original material-only evaluator.
-- Per-move node counts for minimax in human and spectator games.
+- Per-move node and alpha-beta cutoff counts for minimax in human and spectator
+  games.
 - Persistent profile Elo ratings fitted in an order-independent batch from all
   saved head-to-head results after each tournament. Same-profile self-play is
   explicitly unrated.
@@ -114,6 +117,14 @@ makes random moves and equal-score tie breaking reproducible outside tournaments
 the tournament runner deliberately overrides profile seeds with its reported
 tournament seed. `CHESS_BOT_CONFIG` may point to an alternate global TOML file;
 its profiles directory is resolved relative to that file.
+
+`search.pruning.alpha_beta` enables exact alpha-beta pruning and defaults to
+true. `search.move_ordering` accepts `captures` or `none`; `captures` searches
+promotions and high-value captures first below the root. Root moves are shuffled
+with the bot's seeded random generator, and the first best move is retained. This
+keeps selection uniform among tied best moves while allowing bounds to be shared
+between root moves. Disabling alpha-beta retains exhaustive minimax as a testing
+and teaching baseline. Search statistics count visited nodes and cutoffs.
 
 `evaluation.piece_square_tables.enabled` makes table sets available. Its
 `directory` is resolved beside `engine.toml`, and `default_table_set` must match
@@ -188,8 +199,8 @@ approximate.
 2. Material evaluation with one-ply move selection and profiles (complete).
 3. Minimax search to a fixed configurable depth (current).
 4. Static piece-square positional evaluation (current).
-5. Alpha-beta pruning and basic move ordering (next).
-6. Quiescence search for tactical stability.
+5. Alpha-beta pruning and basic move ordering (complete).
+6. Quiescence search for tactical stability (next).
 7. Further positional features: mobility, pawn structure, dynamic king safety,
    space, development, and endgame adjustments.
 8. Iterative deepening, transposition tables, and time management.

@@ -71,6 +71,8 @@ def create_bot(
             depth=profile.search_depth,
             name=bot_name,
             rng=rng,
+            alpha_beta=config.search_alpha_beta,
+            move_ordering=config.search_move_ordering,
         )
 
     raise ConfigError(f"No implementation exists for strategy {profile.strategy!r}.")

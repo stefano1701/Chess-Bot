@@ -23,13 +23,13 @@ max_depth = 2                 # Default for minimax profiles; measured in plies.
 iterative_deepening = false
 time_limit_ms = 0             # 0 = no search clock.
 node_limit = 0                # 0 = unlimited.
-move_ordering = "none"
+move_ordering = "captures"     # Promotions, then valuable captures first.
 aspiration_windows = false
 aspiration_window_cp = 0
 transposition_table = false
 
 [search.pruning]
-alpha_beta = false
+alpha_beta = true
 null_move = false
 null_move_reduction = 0
 late_move_reductions = false
